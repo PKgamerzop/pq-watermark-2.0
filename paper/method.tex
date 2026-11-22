@@ -1,0 +1,19 @@
+\section{Provenance Protocol}
+\subsection{Signing and embedding}
+The developer commits to the ordered CIFAR-10 training set with a SHA-256 Merkle tree. Each leaf binds the sample index, label, and image bytes. A canonical JSON manifest records the root, model architecture and width, parameter count, and signing-key identifier. The developer signs the serialized manifest using ML-DSA-65~\cite{nist204}. The watermark payload is the 256-bit SHA-256 digest of those same manifest bytes. The auditor receives the signed manifest and a trusted public key separately from the model~\cite{projectResults}.
+
+We encode the 32-byte payload using Reed--Solomon coding. RS32 appends 32 parity bytes, giving 512 binary code values; RS16 appends 16 parity bytes, giving 384. For the last convolutional layer, we average the 128 output filters and flatten the result into a vector $v$ of length $64\times3\times3=576$. A separate secret watermark key determines a reproducible matrix $X$ with entries in $\{-1,+1\}$. Each row of $X$ defines one projection score in $z=Xv$. Its sign predicts a code bit~\cite{uchida2017embedding,projectResults}.
+
+The training objective adds $\lambda L_{\mathrm{wm}}$ to classification cross-entropy. Let $s_i\in\{-1,+1\}$ denote the target sign and $n$ the number of encoded bits. The two watermark losses are
+\begin{align}
+L_{\mathrm{BCE}} &= n^{-1}\sum_i \log(1+\exp(-s_i z_i)),\\
+L_{\mathrm{hinge}} &= n^{-1}\sum_i \max(0,m-s_i z_i).
+\end{align}
+Both objectives penalize a bit whose projection has the wrong sign. Once a signed score reaches $m$, that bit contributes zero hinge loss. Binary cross-entropy (BCE) continues to reward a larger signed score. This difference motivates measuring clean accuracy and performance after an overwrite separately.
+
+\subsection{Verification and scope}
+The auditor checks the manifest signature, signed architecture and parameter count, and finiteness of the checkpoint weights. The auditor then computes the projection scores and decodes the payload, using low-confidence bytes as candidate erasures. Exact agreement with the recomputed manifest digest yields \textsc{Verified}. For an eligible code and carrier shape, the verifier can also retry extraction after channel alignment and positive scale recovery~\cite{projectResults}.
+
+If exact recovery fails, the auditor counts raw codeword agreement in the original channel order. For RS32, agreement on at least 358 of 512 positions yields \textsc{Damaged}; the threshold corresponds to an upper-tail probability below $2^{-64}$ under independent equiprobable signs. This verdict indicates residual evidence. A failed signature check, a failed structural check, or insufficient watermark evidence yields \textsc{Rejected}. The statistical threshold applies to the specified raw comparison. We assess the behavior of the complete verification procedure separately using negative controls.
+
+The auditor needs white-box access and the secret watermark key. Our threat model allows a third party to modify the weights. The dataset commitment lets the auditor check a supplied dataset against the signed root. Establishing that the developer actually used those data for training requires independent evidence.

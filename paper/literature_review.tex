@@ -1,0 +1,15 @@
+\section{Literature Review}
+\label{sec:related-work}
+
+\subsection{Authenticating updates and release records}
+Li \emph{et al.} evaluated Dilithium, FALCON, and SPHINCS+ for authenticating model updates in federated learning. They found Dilithium the most efficient of the three in their tested settings~\cite{li2024federated}. Their verification procedure concerns a particular update exchanged during training. Campbell addressed a longer-lived object: a model bill of materials that records release information and supports post-quantum signing and attestation~\cite{campbell2026mbom}. Together, these approaches motivate a question for a downstream auditor: given a signed release record and a separately obtained, fine-tuned checkpoint, what evidence in the checkpoint links the two?
+
+\subsection{Recovering evidence from a watermark carrier}
+Uchida \emph{et al.} introduced a training regularizer that encodes a message in neural-network parameters. They recovered the watermark after fine-tuning and, in one pruning experiment, after removing 65\% of the parameters~\cite{uchida2017embedding}. This result makes the weights themselves a candidate carrier for a release identifier. It also suggests two measurements for a modified classifier: whether the watermark remains readable and whether the classifier retains useful accuracy.
+
+Hu \emph{et al.} combined latent-space embedding, error-correcting codes, and post-quantum key encapsulation in a diffusion-model watermarking scheme. They evaluated recovery from generated images and the effect of embedding on image quality~\cite{hu2026diffusion}. Their use of redundancy motivates measuring how many bit errors a decoder can repair. The choice of carrier determines the relevant test: in our setting an auditor reads convolutional weights, and channel reordering can change a keyed projection while preserving the network's predictions~\cite{projectResults}.
+
+\subsection{Position of this study}
+Our SmallCNN implementation signs a manifest containing a CIFAR-10 dataset commitment with ML-DSA-65, a parameter set defined in FIPS~204~\cite{nist204}. It embeds a Reed--Solomon encoding of the manifest's 256-bit fingerprint in the weights. Verification checks the signature and the recovered fingerprint. This ties the checkpoint to the developer's signed claim; independent evidence would be needed to establish which data actually entered training~\cite{projectResults}.
+
+We evaluated the choice of watermark loss while holding the payload and error-correcting code fixed. Across five paired seeds, the hinge-loss models averaged 84.10\% test accuracy and the binary cross-entropy models averaged 82.37\%. In the separate three-seed robustness evaluation, a 512-bit overwrite removed the hinge watermark on all three seeds within the five-percentage-point accuracy-drop limit~\cite{projectResults}. This tradeoff is why our evaluation reports a verification verdict alongside the predictive accuracy of each modified model.

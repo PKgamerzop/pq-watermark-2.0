@@ -1,0 +1,42 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+% Keep neighboring figure blocks distinct in the two-column layout.
+\setlength{\floatsep}{22pt plus 3pt minus 2pt}
+\setlength{\dblfloatsep}{22pt plus 3pt minus 2pt}
+\setlength{\textfloatsep}{18pt plus 3pt minus 2pt}
+\setlength{\dbltextfloatsep}{22pt plus 3pt minus 2pt}
+
+\title{Post-Quantum Provenance Watermarking for Neural Network Classifiers}
+% Authors sharing an affiliation can share one block.
+% For another affiliation, insert \and followed by another name/address block.
+\author{
+  \IEEEauthorblockN{First Author Name and Second Author Name}
+  \IEEEauthorblockA{\textit{Department Name, Institution Name}\\
+    City, Country\\
+    first@example.org, second@example.org}
+}
+
+\begin{document}
+\maketitle
+
+\input{abstract}
+\begin{IEEEkeywords}
+Model provenance, neural network watermarking, post-quantum signatures, error correction.
+\end{IEEEkeywords}
+\input{introduction}
+\input{literature_review}
+\input{method}
+\input{evaluation}
+
+\newpage % Start references in the adjacent IEEE column.
+\begingroup
+% Keep long reference entries from stretching the spaces between words.
+\raggedright
+\bibliographystyle{IEEEtran}
+\bibliography{provenance_refs}
+\endgroup
+\end{document}
