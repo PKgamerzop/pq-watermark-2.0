@@ -8,12 +8,12 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)](#quick-start)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org)
 [![liboqs](https://img.shields.io/badge/crypto-liboqs--python-0a7bbb)](https://github.com/open-quantum-safe/liboqs-python)
-[![Tests](https://img.shields.io/badge/tests-76%20passing-2ea44f)](#tests)
-[![Status](https://img.shields.io/badge/phases-0%E2%80%936b%20done%2C%207%20in%20progress-orange)](#roadmap)
+[![Tests](https://img.shields.io/badge/Windows_tests-85_passed%2C_1_failed-orange)](#tests)
+[![Status](https://img.shields.io/badge/SmallCNN-IEEE_paper_%26_8_figures_ready-blue)](#roadmap)
 
-*Sign a model's origin with a post-quantum signature, hide the proof in its weights,<br>and let anyone check it with one command: **VERIFIED** or **REJECTED**.*
+*Sign a model's origin with a post-quantum signature, hide the proof in its weights,<br>and let anyone check it with one command: **VERIFIED**, **DAMAGED** or **REJECTED**.*
 
-[How it works](#how-it-works) · [Results](#results) · [Quick start](#quick-start) · [Dashboard](#pqctl-the-control-centre) · [Limitations](#honest-limitations) · [Roadmap](#roadmap)
+[How it works](#how-it-works) · [Results](#results) · [Paper & figures](#paper-and-figures) · [Quick start](#quick-start) · [Dashboard](#pqctl-the-control-centre) · [Limitations](#honest-limitations) · [Roadmap](#roadmap)
 
 </div>
 
@@ -27,8 +27,9 @@
 | **Proof inside the weights** | A **256-bit payload** derived from the signed manifest is embedded *in the weights* during training, so stripping a signature file does not remove the proof. |
 | **Dataset commitment** | All **50,000 CIFAR-10 training images** are committed with a single **Merkle root**: change one pixel, label or image order and verification fails. |
 | **Error correction** | **Reed-Solomon (rs32)** protects the payload: 256 bits become 512 code values, so damaged bytes can be repaired. |
-| **Attacked 252 times** | **47 attack configurations** (noise, pruning, quantization, fine-tuning, rescaling, permutation, channel scaling, overwriting) on 3 models: **0 successful removals**; 231 copies verified exactly, 20 still traced. |
-| **Zero false accepts** | **0 of 18** unwatermarked baseline models were ever accepted, attacked or not. |
+| **Robustness** | 252 evaluations per design, including controls. BCE/RS32 and BCE/RS16 recorded zero successful removals. Hinge/RS32 recorded three, all under a 512-bit overwrite. |
+| **False positives** | No false VERIFIED or DAMAGED verdicts in 724 null cases or in 54 attacked baseline evaluations (778 total controls). |
+| **IEEE manuscript** | Overleaf-ready IEEE conference paper in [`paper1/`](paper1/) with 5 tables, 8 reproducible 300-DPI figures, and 17 verified published/IEEE references. |
 | **One control centre** | `pqctl`: a local web dashboard and terminal tool that runs every phase, plus interactive labs (Watermark X-ray, Attack lab, Tamper lab, Signing lab). |
 
 ---
@@ -82,7 +83,7 @@ flowchart LR
 
 ## Results
 
-All numbers below are measured, not projected. They come from `runs/`, `results/` and `docs/`, and every one can be regenerated with `python -m pqctl pipeline check-all`.
+The Phase 7 report combines the saved SmallCNN runs, verifier verdicts, and accuracy measurements. [Results and methods](docs/phase7_results.md)
 
 ### Accuracy cost of the watermark
 
@@ -90,16 +91,27 @@ SmallCNN (160,234 parameters) on CIFAR-10, 30 epochs, accuracy differences paire
 
 | Model | Test accuracy | Change vs baseline |
 |---|---:|---:|
-| Baseline, no watermark (3 seeds) | **85.07% ± 1.19** | — |
-| **rs32, layer `features.6.0`, λ = 20 (chosen design)** | **81.98%** | **−3.10 pts** |
-| rs16, layer `features.6.0`, λ = 20 | 82.26% | −2.81 pts |
-| rep2, layer `features.6.0`, λ = 20 | 81.52% | −4.20 pts |
+| Baseline (seeds 0–4) | 84.60% | — |
+| BCE/RS32 (seeds 0–4) | 82.37% | −2.23 pts |
+| Hinge 1.5/RS32 (seeds 0–4) | 84.10% | −0.50 pts |
+| BCE/RS16 (seeds 0–2) | 82.26% | −2.81 pts |
+| BCE/rep2 (seeds 0–1) | 81.52% | −4.20 pts |
 
-Every chosen-design model decodes with **0 bit errors** after correction (minimum margin 2.24).
+Every chosen-design model decodes with **0 bit errors** after correction (minimum margin 2.24 for BCE/RS32, 2.71 for BCE/RS16, 1.50 for Hinge 1.5/RS32). Weight decomposition of `features.6.0.weight` explains the +1.73 pt Hinge recovery: unbounded BCE inflates the shared mean filter norm to **5.05** (97% of layer energy), whereas Hinge 1.5 caps it at **2.39** (89% of layer energy; baseline is 0.11–0.13 / 2–3%).
 
-### Robustness: 47 attacks × 3 models
+### Robustness across designs (252 evaluations each, seeds 0–2)
 
-A removal only counts as a **success** if the verifier stops saying VERIFIED **and** the model is still useful (accuracy within 5 points of the clean model). Destroying a model to kill its mark proves nothing.
+A successful removal requires a REJECTED verdict and a test accuracy drop of at most five percentage points from the clean model. DAMAGED indicates statistical evidence of the watermark (≥ 358/512, chance < 2⁻⁶⁴).
+
+| Design | Verified | Damaged | Rejected | Successful removals | Failure mode |
+|---|---:|---:|---:|---:|---|
+| **BCE / RS32** | 231 | 20 | 1 | **0** | 2-bit quantization (9.5% acc, ruined) |
+| **BCE / RS16** | 240 | 12 | 0 | **0** | None (even exact VERIFIED on 128-bit overwrite) |
+| **Hinge 1.5 / RS32** | 233 | 13 | 6 | **3** | `overwrite_512bit` (acc drops 3.38–4.71 pts) |
+
+All **108 evaluations** involving channel permutation or combined permutation + ×10 scaling verified with exact 256-bit recovery across all three designs.
+
+### Attack-by-attack breakdown (BCE/RS32)
 
 | Attack family | Strongest setting that still verified | Outcome |
 |---|---|:---:|
@@ -121,16 +133,18 @@ A removal only counts as a **success** if the verifier stops saying VERIFIED **a
 **How Phase 6b closes the gaps.** Shuffling or positively rescaling the channels that feed the carrier leaves the model's answers identical but scrambles the carrier. The verifier now undoes both (Hungarian re-alignment and a small linear program, `embedding/align.py`) and still demands an exact 256-bit match. That search only runs when a counting bound (Cover's theorem) proves it cannot fit a codeword the model never carried: below 2⁻²³⁹ for rs32. When an overwrite destroys the exact payload, the verifier counts how many code values still agree with the signed codeword in the model's own channel order. Above 358 of 512 the chance for an unmarked model is below 2⁻⁶⁴, so it reports **DAMAGED**: the copy is provably derived from ours.
 
 <details>
-<summary><b>Show the plots</b></summary>
+<summary><b>Show the plots (8 publication-grade 300-DPI figures)</b></summary>
 
 | | |
 |:---:|:---:|
-| ![Noise](results/phase6/plots/noise.png) | ![Quantization](results/phase6/plots/quantize.png) |
-| **Noise** | **Quantization** |
-| ![Pruning](results/phase6/plots/prune_global.png) | ![Fine-tuning](results/phase6/plots/finetune.png) |
-| **Global pruning** | **Fine-tuning** |
-| ![Lambda trade-off](results/phase7/plots/lambda_tradeoff.png) | ![ECC under attack](results/phase7/plots/ecc_under_attack.png) |
-| **λ trade-off (Phase 7)** | **ECC under attack (Phase 7)** |
+| ![Architecture](results/phase7/paper_figures/00_architecture.png) | ![Paired accuracy](results/phase7/paper_figures/01_paired_accuracy.png) |
+| **End-to-end protocol architecture** | **Paired CIFAR-10 accuracy (5 seeds)** |
+| ![Robustness & overwrite](results/phase7/paper_figures/02_robustness.png) | ![BCE vs Hinge mechanism](results/phase7/paper_figures/06_mechanism_bce_vs_hinge.png) |
+| **252-checkpoint verdicts & 512-bit overwrite** | **BCE vs Hinge logit margins & weight energy** |
+| ![Alignment & naive comparison](results/phase7/paper_figures/07_alignment_and_attacks.png) | ![False-positive controls](results/phase7/paper_figures/04_false_positive_controls.png) |
+| **Obfuscation recovery & naive vs projection** | **724 negative controls vs Binomial(512, 1/2)** |
+| ![ECC under quantization](results/phase7/paper_figures/05_ecc_quantization.png) | ![Lambda strength sweep](results/phase7/paper_figures/03_strength_seed0.png) |
+| **RS32 error correction & accuracy under quantization** | **Watermark strength sweep (seed 0)** |
 
 </details>
 
@@ -272,9 +286,9 @@ Full guide: [`docs/PQCTL.md`](docs/PQCTL.md).
 
 This project is pitched to mentors and faculty, so its claims must be defensible. Here is what it does **not** do:
 
-- **Overwriting still erases the exact payload.** Fine-tuning a second watermark into the same layer leaves the copy traceable (DAMAGED, at a 3.7-5.3 point accuracy cost) but not exactly verifiable. DAMAGED is statistical evidence of origin, not proof of the exact signed payload.
-- **Not yet tested:** dummy-neuron obfuscation (it changes the signed parameter count, so the model is rejected; that still counts as a removal), overwriting a different layer, much longer fine-tuning, and the rs16 models.
-- **Accuracy cost.** About 3 points with the chosen design (85.1% → 82.0%).
+- **Overwrite results depend on the design.** A 512-bit overwrite produced successful removals on all three hinge seeds. BCE/RS32 and BCE/RS16 had zero successful removals across their tested configurations.
+- Further robustness questions include dummy neurons, overwrites in a different layer, and longer fine-tuning.
+- **Accuracy cost.** Across five paired seeds, hinge gained 1.73 accuracy points over BCE/RS32. Both use the same SmallCNN and signed 256-bit payload.
 - **White-box only.** The auditor needs the weights, not just API access.
 - **Not a data-quality proof.** The Merkle root proves *which* data was committed, not that it was clean, and not that the weights were actually trained on it.
 - **Distillation is out of scope.** Training a fresh model on our model's outputs is not defended against.
@@ -293,7 +307,10 @@ verify/          verify_release (signature) and verify_model (the auditor's one 
 attacks/         Phase 6 suite: weight attacks, training attacks, registry, evaluation, summary
 experiments/     one script per phase "done when" check, Phase 7 collection and plots
 pqctl/           the control centre: tasks, runner, web server, lab actions, static dashboard
-tests/           76 unit and integration tests (no project keys needed)
+tests/           unit and integration tests
+paper1/          Overleaf-ready IEEE conference manuscript (main.tex, 5 tables, 8 figures, verified BibTeX)
+paper/           initial IEEE draft and Overleaf archive
+notebooks/       Google Colab GPU training & attack notebooks
 release/         the signed manifest, payload.hex and public key
 mallory/         a second developer, for the negative cases
 runs/  results/  trained models, attacked copies, tables and plots
@@ -302,43 +319,65 @@ docs/            threat model, measured results, every command used, pqctl guide
 
 ---
 
+## Paper and figures
+
+The full Overleaf-ready IEEE conference manuscript lives in [`paper1/`](paper1/) (`main.tex`, `abstract.tex`, `introduction.tex`, `literature_review.tex`, `method.tex`, `evaluation.tex`, `provenance_refs.bib`, and `figures/`). All 17 references in `paper1/provenance_refs.bib` are verified published/IEEE/standard entries (no archive-only preprints).
+
+Regenerate all **eight 300-DPI PNG figures** from the saved CSVs and checkpoints (and sync them into `paper1/figures/`):
+
+```bash
+python -m experiments.phase7.paper_figures --also-copy paper1/figures
+```
+
+Generated figures ([`results/phase7/paper_figures/`](results/phase7/paper_figures/)):
+1. `00_architecture.png` — End-to-end Merkle + ML-DSA-65 + RS projection + Cover-bounded verifier architecture
+2. `01_paired_accuracy.png` — Paired clean CIFAR-10 accuracy across 5 seeds with mean markers
+3. `02_robustness.png` — 252-checkpoint verdict breakdown and 512-bit overwrite drops vs. the 5-point utility limit
+4. `03_strength_seed0.png` — Seed-0 watermark strength (λ) vs. accuracy and minimum logit margin
+5. `04_false_positive_controls.png` — 724 negative controls against exact Binomial(512, 1/2) and the 358 `DAMAGED` threshold
+6. `05_ecc_quantization.png` — RS32 error correction and CIFAR-10 accuracy under per-tensor quantization
+7. `06_mechanism_bce_vs_hinge.png` — BCE vs. Hinge projection margin distributions and carrier shared-filter weight decomposition
+8. `07_alignment_and_attacks.png` — Structural obfuscation recovery (before vs. after alignment) and naive sign vs. projection comparison
+
 ## Roadmap
 
 | Phase | Title | Status |
 |:---:|---|:---:|
 | 0 | Scope, threat model, tooling | ✅ |
-| 1 | Baseline CNN (3 seeds) | ✅ |
+| 1 | Baseline CNN (3 seeds, later extended to 5) | ✅ |
 | 2 | Merkle root, manifest, ML-DSA signature, tamper demo | ✅ |
 | 3 | First watermark (32 bits, no ECC) | ✅ |
-| 4 | Full 256-bit payload with Reed-Solomon, noise test | ✅ |
-| 5 | One-command verifier, Mallory, negative cases | ✅ |
+| 4 | Full 256-bit payload with Reed-Solomon, noise test, Hinge fix (A1) | ✅ |
+| 5 | One-command verifier, Mallory, negative cases, full-payload fix (H1) | ✅ |
 | 6 | 43-attack suite and results | ✅ |
 | 6b | Permutation and scaling defence, DAMAGED verdict, false-accept stress test | ✅ |
-| 7 | Evaluation: λ, ECC and payload sweeps, more seeds, ResNet-18 | in progress (P7.1 done) |
-| 8 | Write-up, 3-minute live demo, mentor Q&A | planned |
+| 7 | SmallCNN/CIFAR-10 evaluation | ✅ Five-seed accuracy, 3-design robustness, report, and 8 publication figures ready (19 sweep runs are future work) |
+| 8 | Write-up, 3-minute live demo, mentor Q&A | in progress (IEEE manuscript in `paper1/` ready for Overleaf; demo & Q&A remain) |
 
 ---
 
 ## Tests
 
 ```bash
-pytest                    # 76 tests: Merkle, manifest, ML-DSA, projection, ECC, verifier, attacks, Phase 6b defence, pqctl
+pytest                    # run the local suite
 ```
 
-The tests are self-contained: they make temporary keys, releases and small watermarked models, and never touch `keys/`, `release/` or `runs/`.
+Latest Windows check (2026-11-22): 85 passed and one failure. The pqctl cancellation test still observed a running job after 15 seconds.
 
 ---
 
 ## Team
 
-Built by engineering students: **shield44 (Thejas K S)**, **Krishnadasa Raja**, **PKgamerzop** and **mahithreddy-bit**. Training ran on Google Colab (Tesla T4). Local work ran on Fedora, WSL2 Ubuntu and native Windows 11.
+Built by engineering students at **RV College of Engineering, Bengaluru**: **Prajjith Kumar (`PKgamerzop`)**, **Thejas K S (`shield44`)**, **Krishnadasa Raja**, and **S Mahith Shree Vema Reddy (`mahithreddy-bit`)**, mentored by **Dr. Nivya Muchikel** (Department of Mathematics). Training ran on Google Colab (Tesla T4); local work ran on Fedora, WSL2 Ubuntu, and native Windows 11.
 
 ## References
 
 - NIST **FIPS 204**: *Module-Lattice-Based Digital Signature Standard (ML-DSA)*, 2024.
-- Y. Uchida, Y. Nagai, S. Sakazawa, S. Satoh: *Embedding Watermarks into Deep Neural Networks*, ICMR 2017.
+- Y. Uchida, Y. Nagai, S. Sakazawa, S. Satoh: *Embedding Watermarks into Deep Neural Networks*, ACM ICMR 2017.
+- Y. Yan, X. Pan, M. Zhang, M. Yang: *Rethinking White-Box Watermarks on Deep Learning Models under Neural Structural Obfuscation*, USENIX Security 2023.
+- T. M. Cover: *Geometrical and Statistical Properties of Systems of Linear Inequalities with Applications in Pattern Recognition*, IEEE Trans. Electronic Computers, 1965.
 - R. Merkle: *A Digital Signature Based on a Conventional Encryption Function*, CRYPTO 1987.
-- I. Reed, G. Solomon: *Polynomial Codes over Certain Finite Fields*, 1960.
+- I. Reed, G. Solomon: *Polynomial Codes over Certain Finite Fields*, SIAM 1960.
 - [Open Quantum Safe / liboqs](https://openquantumsafe.org) and [`reedsolo`](https://pypi.org/project/reedsolo/).
 
 <div align="center">
