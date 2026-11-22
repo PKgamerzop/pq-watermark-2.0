@@ -169,8 +169,9 @@ def comparison(naive_csv, att_csv, outdir, useful):
         ax.bar(x + (i - 0.5) * 0.38, ver, 0.36, color=col, label=name + ": VERIFIED exactly")
     ax.set_xticks(x)
     ax.set_xticklabels(fams, rotation=30, ha="right")
-    ax.set(ylim=(0, 1.05), ylabel="share of attacked copies", title="Same payload, same ECC, same attacks: naive signs vs projection")
-    ax.legend(fontsize=7, loc="lower left")
+    ax.set(ylim=(0, 1.08), ylabel="share of attacked copies")
+    ax.set_title("Same payload, same ECC, same attacks: naive signs vs projection", pad=38)
+    ax.legend(fontsize=7.5, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=2, frameon=False)
     fig.tight_layout()
     fig.savefig(outdir / "naive_vs_projection.png", dpi=170)
     plt.close(fig)
@@ -294,10 +295,14 @@ def main():
                         {k: pct for k in ("naive_verified", "naive_detected", "proj_verified", "proj_detected")}), "",
                "![naive vs projection](../results/phase7/plots/naive_vs_projection.png)", ""]
 
-    md += ["## Still to do", "",
-           "- **P7.5 (Colab GPU):** lambda sweep on 3 seeds, payload size 64 / 128 / 256 bits at rate 1/2, ECC off at 256 bits, "
-           "using the existing 256-bit runs for comparison. See `docs/phase_commands.md`, Phase 7.",
-           "- **P7.6:** a second model (ResNet-18), which needs its own signed release.", ""]
+    md += ["## Paper figures and remaining work", "",
+           "Run `python -m experiments.phase7.paper_figures` to regenerate the eight 300-DPI PNGs. "
+           "[Paper figures](../results/phase7/paper_figures/)", "",
+           "The paper covers SmallCNN on CIFAR-10. Future work includes 19 BCE runs "
+           "(3 without ECC, 10 varying watermark strength, 6 varying payload length). "
+           "The current data support a single-seed strength comparison and measured error correction under quantization. "
+           "A matched payload-length comparison remains open.", "",
+           "The manuscript, three-minute demo and mentor Q&A remain to be prepared.", ""]
     Path(args.out).write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))
     print("\nwrote", args.out, "and plots in", outdir)

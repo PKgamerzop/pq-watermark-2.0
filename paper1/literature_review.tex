@@ -1,0 +1,36 @@
+\section{Related Work}
+\label{sec:related-work}
+
+Research relevant to quantum-safe AI provenance spans three intersecting directions: post-quantum authentication of ML artifacts and deployments, post-quantum media and generative-output watermarking, and white-box neural parameter watermarking under structural attacks. Table~\ref{tab:related-work} summarizes how representative published works compare with our protocol.
+
+\subsection{Post-Quantum Authentication and AI Supply-Chain Provenance}
+Li \emph{et al.}~\cite{li2024federated} evaluated NIST post-quantum digital signatures---CRYSTALS-Dilithium (now ML-DSA), FALCON, and SPHINCS+---for authenticating model updates in federated learning, finding Dilithium to offer the strongest efficiency balance in their tested settings. Stalin and Rai~\cite{stalin2025automotive} benchmarked Dilithium/ML-DSA on automotive-grade hardware (an Infineon AURIX TC-222 microcontroller and an ARM Cortex-A53 SoC), documenting concrete key and signature footprints (1,952-byte public keys and 3,309-byte signatures for Dilithium3/ML-DSA-65) and showing that platform optimizations such as ARM NEON accelerate signing and verification substantially while bulk payload signing remains costly on constrained microcontrollers. At the supply-chain governance level, Campbell~\cite{campbell2026mbom} formulated the harvest-now, forge-later (HNFL) signature threat for long-lived AI artifacts and proposed a Model Bill of Materials with post-quantum attestation (MBOM-PQC) using ML-DSA and SLH-DSA. Together, these works establish how to sign external release records or training updates against quantum adversaries, but they do not embed a resilient cryptographic link inside the model weights themselves when a checkpoint is detached from its manifest and modified downstream.
+
+\subsection{Post-Quantum Watermarking for Media and Generative Outputs}
+Several recent studies pair post-quantum primitives with watermarking for digital media or generative outputs rather than classifier weights. Hu \emph{et al.}~\cite{hu2026diffusion} embedded error-corrected watermarks in the latent space of diffusion models while protecting key material via post-quantum key encapsulation, demonstrating robust bit recovery from generated images. Ikram \emph{et al.}~\cite{ikram2026medical} designed a deliberately fragile, quantum-inspired DCT watermarking framework for medical imagery using SHA3-256 key derivation and coefficient entanglement to localize subtle pixel tampering---a tamper-evidence objective opposite to robust provenance retention. YunusBasha and UlagaPriya~\cite{yunusbasha2026deepfake} combined DWT--DCT video-frame watermarking, deepfake classifiers (CNN, EfficientNet, GRU), and simulated PQC/blockchain components for media authenticity, though without quantitative watermark-removal benchmarks. In the generative-AI patent literature, Sehrawat~\cite{sehrawat2026patent} proposed multiparty post-quantum verifiable watermarking using distributed key generation and trusted execution environments to bias token distributions of generative models. Unlike output-space or media watermarks, our protocol embeds provenance directly inside classifier weights so an auditor can authenticate a redistributed checkpoint independently of generated samples.
+
+\subsection{White-Box Weight Watermarking and Structural Obfuscation}
+Uchida \emph{et al.}~\cite{uchida2017embedding} introduced parameter-regularization watermarking, projecting averaged convolutional filter weights through a secret matrix and optimizing a binary cross-entropy penalty alongside task loss. While resilient to standard fine-tuning and moderate pruning, white-box parameter watermarks are vulnerable to neural structural obfuscation: Yan \emph{et al.}~\cite{yan2023rethinking} showed that function-preserving edits---channel permutation, positive scaling, and dummy-neuron injection---can disrupt white-box extractors at zero classification cost. Our work builds on Uchida-style projection embedding~\cite{uchida2017embedding} and Reed--Solomon coding~\cite{reed1960polynomial}, extends it with an ML-DSA-65 signed dataset manifest, closes input-channel permutation and positive-scaling obfuscation via provably bounded alignment~\cite{cover1965geometrical}, and empirically isolates the clean-accuracy versus overwrite-resistance tradeoff between BCE and hinge objectives.
+
+\begin{table*}[!t]
+\centering
+\caption{Comparison of Related Post-Quantum Provenance and Watermarking Approaches}
+\label{tab:related-work}
+\scriptsize
+\begin{tabular}{@{}p{2.3cm}p{2.4cm}p{2.3cm}p{2.6cm}p{2.3cm}p{2.5cm}@{}}
+\toprule
+\textbf{Work} & \textbf{Protected Artifact} & \textbf{PQC Primitive} & \textbf{Watermark / Carrier} & \textbf{Dataset Commitment} & \textbf{Weight-Attack / Obfuscation Eval.} \\
+\midrule
+Li \emph{et al.}~\cite{li2024federated} & Federated updates & Dilithium, FALCON, SPHINCS+ & None (external signatures) & No & N/A \\
+Stalin \& Rai~\cite{stalin2025automotive} & Automotive OTA / V2X & ML-DSA (Dilithium) & None (ECU benchmarks) & No & N/A \\
+Campbell~\cite{campbell2026mbom} & AI supply-chain MBOM & ML-DSA, SLH-DSA, hybrid & None (attestation schema) & Metadata schema & Conceptual only \\
+Hu \emph{et al.}~\cite{hu2026diffusion} & Diffusion-model images & Post-quantum KEM & Latent-space ECC mark & No & Image edits only \\
+Ikram \emph{et al.}~\cite{ikram2026medical} & Medical images & SHA3-256 symmetric key & Fragile entangled DCT & No & Fragile tamper maps \\
+YunusBasha~\cite{yunusbasha2026deepfake} & Deepfake video frames & Dilithium/Kyber (sim.) & Hybrid DWT--DCT & No & Classifier only \\
+Sehrawat~\cite{sehrawat2026patent} & Multiparty GAI tokens & PQ-DKG + PQ-KEM & Token green-list bias & No & Patent specification \\
+Uchida \emph{et al.}~\cite{uchida2017embedding} & CNN model weights & None (classical) & Projection regularizer & No & Fine-tune, prune \\
+Yan \emph{et al.}~\cite{yan2023rethinking} & White-box DNN marks & None (attack study) & Attacks 9 white-box marks & No & NSO (permute/scale/dummy) \\
+\textbf{This work} & \textbf{CNN weights + manifest} & \textbf{ML-DSA-65 (FIPS 204)} & \textbf{RS-coded projection (BCE vs.\ Hinge)} & \textbf{SHA-256 Merkle root (50k images)} & \textbf{47 attacks; Cover-bounded align + overwrite} \\
+\bottomrule
+\end{tabular}
+\end{table*}

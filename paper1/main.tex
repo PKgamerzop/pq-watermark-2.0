@@ -1,0 +1,45 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+
+% Keep neighboring figure and table blocks visually distinct in two-column layout.
+\setlength{\floatsep}{16pt plus 3pt minus 2pt}
+\setlength{\dblfloatsep}{16pt plus 3pt minus 2pt}
+\setlength{\textfloatsep}{14pt plus 3pt minus 2pt}
+\setlength{\dbltextfloatsep}{14pt plus 3pt minus 2pt}
+
+\title{Post-Quantum Provenance Watermarking for Neural Network Classifiers: Accuracy, Structural Obfuscation, and Overwrite Tradeoffs}
+
+% Team authors from RV College of Engineering (update email addresses and author order as needed).
+\author{
+  \IEEEauthorblockN{Prajjith Kumar\IEEEauthorrefmark{1}, Thejas K S\IEEEauthorrefmark{1}, Krishnadasa Raja\IEEEauthorrefmark{2}, and S Mahith Shree Vema Reddy\IEEEauthorrefmark{2}}
+  \IEEEauthorblockA{\IEEEauthorrefmark{1}\textit{Department of Computer Science and Engineering}, \IEEEauthorrefmark{2}\textit{Department of Artificial Intelligence and Machine Learning}\\
+    RV College of Engineering, Bengaluru, India\\
+    \{prajjithkumar, thejasks, krishnadasaraja, smahithshree\}@rvce.edu.in}
+}
+
+\begin{document}
+\maketitle
+
+\input{abstract}
+\begin{IEEEkeywords}
+AI model provenance, neural network watermarking, post-quantum cryptography, ML-DSA-65, Reed--Solomon coding, structural obfuscation.
+\end{IEEEkeywords}
+
+\input{introduction}
+\input{literature_review}
+\input{method}
+\input{evaluation}
+
+\section*{Acknowledgment}
+The authors thank Dr.~Nivya Muchikel, Assistant Professor, Department of Mathematics, RV College of Engineering, for mentorship and guidance throughout this project.
+
+\begingroup
+\raggedright
+\bibliographystyle{IEEEtran}
+\bibliography{provenance_refs}
+\endgroup
+\end{document}

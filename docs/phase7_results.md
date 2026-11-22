@@ -129,7 +129,10 @@ Naive scheme (the project's first design): bit = sign of one key-chosen weight. 
 
 ![naive vs projection](../results/phase7/plots/naive_vs_projection.png)
 
-## Still to do
+## Paper figures and remaining work
 
-- **P7.5 (Colab GPU):** lambda sweep on 3 seeds, payload size 64 / 128 / 256 bits at rate 1/2, ECC off at 256 bits, using the existing 256-bit runs for comparison. See `docs/phase_commands.md`, Phase 7.
-- **P7.6:** a second model (ResNet-18), which needs its own signed release.
+Run `python -m experiments.phase7.paper_figures` to regenerate the eight 300-DPI PNGs. [Paper figures](../results/phase7/paper_figures/)
+
+The paper covers SmallCNN on CIFAR-10. Future work includes 19 BCE runs (3 without ECC, 10 varying watermark strength, 6 varying payload length). The current data support a single-seed strength comparison and measured error correction under quantization. A matched payload-length comparison remains open.
+
+The manuscript, three-minute demo and mentor Q&A remain to be prepared.
