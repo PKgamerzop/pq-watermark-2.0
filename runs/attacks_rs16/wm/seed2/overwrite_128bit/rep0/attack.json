@@ -1,0 +1,21 @@
+{
+  "source": "wm",
+  "seed": 2,
+  "attack_id": "overwrite_128bit",
+  "family": "overwrite",
+  "params": {
+    "n_bits": 128,
+    "lam": 20.0,
+    "epochs": 10,
+    "lr": 0.01,
+    "frac": 0.2
+  },
+  "rep": 0,
+  "clean_acc": 0.8395,
+  "attacked_acc": 0.7956,
+  "acc_drop": 0.04390000000000005,
+  "layer": "features.6.0.weight",
+  "seconds": 37.748796701431274,
+  "attacker_ber": 0.0,
+  "attacker_min_abs_logit": 2.86476731300354
+}

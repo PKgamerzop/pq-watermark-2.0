@@ -1,0 +1,15 @@
+{
+  "verdict": "DAMAGED",
+  "wm_read": "FAIL",
+  "payload_match": null,
+  "min_margin": 0.02,
+  "corrected": null,
+  "erasures": null,
+  "n_values": 384,
+  "ecc": "rs16",
+  "n_bits": 256,
+  "layer": "features.6.0.weight",
+  "mode": "mean",
+  "returncode": 2,
+  "flip_rate": 0.17447916666666666
+}

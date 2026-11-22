@@ -1,0 +1,17 @@
+{
+  "source": "wm",
+  "seed": 2,
+  "attack_id": "finetune_e10_lr0.001",
+  "family": "finetune",
+  "params": {
+    "epochs": 10,
+    "lr": 0.001,
+    "frac": 0.2
+  },
+  "rep": 0,
+  "clean_acc": 0.8469,
+  "attacked_acc": 0.8417,
+  "acc_drop": 0.005199999999999982,
+  "layer": "features.6.0.weight",
+  "seconds": 37.287437438964844
+}

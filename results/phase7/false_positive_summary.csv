@@ -1,0 +1,8 @@
+population,models,false_verified,false_damaged,max_agree,mean_agree
+wrong key,600,0,0,305,256.2
+baseline,3,0,0,256,253.3
+baseline scrambled,15,0,0,278,258.5
+mallory,1,0,0,264,264.0
+mallory scrambled,5,0,0,265,259.2
+random init,100,0,0,289,256.1
+attacked baselines (Phase 6b),54,0,0,,

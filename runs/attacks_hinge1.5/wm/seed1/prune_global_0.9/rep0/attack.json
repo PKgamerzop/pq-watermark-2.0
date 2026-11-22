@@ -1,0 +1,17 @@
+{
+  "source": "wm",
+  "seed": 1,
+  "attack_id": "prune_global_0.9",
+  "family": "prune_global",
+  "params": {
+    "sparsity": 0.9,
+    "scope": "global"
+  },
+  "rep": 0,
+  "clean_acc": 0.8273,
+  "attacked_acc": 0.1398,
+  "acc_drop": 0.6875,
+  "layer": "features.6.0.weight",
+  "seconds": 12.370196342468262,
+  "measured_sparsity": 0.8999962402245839
+}

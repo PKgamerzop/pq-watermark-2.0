@@ -1,0 +1,15 @@
+{
+  "source": "wm",
+  "seed": 1,
+  "attack_id": "permute_out_carrier",
+  "family": "permute",
+  "params": {
+    "which": "out_carrier"
+  },
+  "rep": 1,
+  "clean_acc": 0.8273,
+  "attacked_acc": 0.8273,
+  "acc_drop": 0.0,
+  "layer": "features.6.0.weight",
+  "seconds": 16.168508529663086
+}

@@ -1,0 +1,358 @@
+[
+  {
+    "model": "runs\\baseline\\seed3\\model.pt",
+    "verdict": "REJECTED",
+    "checks": [
+      [
+        "load release files",
+        true,
+        ""
+      ],
+      [
+        "key id matches manifest",
+        true,
+        "manifest=bae58d20d2964be6ef068a9ff17772af key=bae58d20d2964be6ef068a9ff17772af"
+      ],
+      [
+        "algorithm is ML-DSA-65",
+        true,
+        ""
+      ],
+      [
+        "signature valid",
+        true,
+        ""
+      ],
+      [
+        "payload.hex matches manifest",
+        true,
+        ""
+      ],
+      [
+        "architecture is SmallCNN",
+        true,
+        "manifest says 'SmallCNN'"
+      ],
+      [
+        "model loads at signed width 32",
+        true,
+        ""
+      ],
+      [
+        "parameter count matches manifest",
+        true,
+        "model 160234, manifest 160234"
+      ],
+      [
+        "weights are finite numbers",
+        true,
+        ""
+      ],
+      [
+        "watermark read (ecc rs32, 512 values)",
+        false,
+        "decoder failed; min margin 0.00"
+      ]
+    ]
+  },
+  {
+    "model": "runs\\baseline\\seed4\\model.pt",
+    "verdict": "REJECTED",
+    "checks": [
+      [
+        "load release files",
+        true,
+        ""
+      ],
+      [
+        "key id matches manifest",
+        true,
+        "manifest=bae58d20d2964be6ef068a9ff17772af key=bae58d20d2964be6ef068a9ff17772af"
+      ],
+      [
+        "algorithm is ML-DSA-65",
+        true,
+        ""
+      ],
+      [
+        "signature valid",
+        true,
+        ""
+      ],
+      [
+        "payload.hex matches manifest",
+        true,
+        ""
+      ],
+      [
+        "architecture is SmallCNN",
+        true,
+        "manifest says 'SmallCNN'"
+      ],
+      [
+        "model loads at signed width 32",
+        true,
+        ""
+      ],
+      [
+        "parameter count matches manifest",
+        true,
+        "model 160234, manifest 160234"
+      ],
+      [
+        "weights are finite numbers",
+        true,
+        ""
+      ],
+      [
+        "watermark read (ecc rs32, 512 values)",
+        false,
+        "decoder failed; min margin 0.00"
+      ]
+    ]
+  },
+  {
+    "model": "runs\\wm_v1\\lam20_n256_rs32\\seed3\\model.pt",
+    "verdict": "VERIFIED",
+    "checks": [
+      [
+        "load release files",
+        true,
+        ""
+      ],
+      [
+        "key id matches manifest",
+        true,
+        "manifest=bae58d20d2964be6ef068a9ff17772af key=bae58d20d2964be6ef068a9ff17772af"
+      ],
+      [
+        "algorithm is ML-DSA-65",
+        true,
+        ""
+      ],
+      [
+        "signature valid",
+        true,
+        ""
+      ],
+      [
+        "payload.hex matches manifest",
+        true,
+        ""
+      ],
+      [
+        "architecture is SmallCNN",
+        true,
+        "manifest says 'SmallCNN'"
+      ],
+      [
+        "model loads at signed width 32",
+        true,
+        ""
+      ],
+      [
+        "parameter count matches manifest",
+        true,
+        "model 160234, manifest 160234"
+      ],
+      [
+        "weights are finite numbers",
+        true,
+        ""
+      ],
+      [
+        "watermark read (ecc rs32, 512 values)",
+        true,
+        "min margin 2.25, corrected 0, erasures 0"
+      ],
+      [
+        "extracted payload == SHA-256(signed manifest)",
+        true,
+        "256 bits match"
+      ]
+    ]
+  },
+  {
+    "model": "runs\\wm_v1\\lam20_n256_rs32\\seed4\\model.pt",
+    "verdict": "VERIFIED",
+    "checks": [
+      [
+        "load release files",
+        true,
+        ""
+      ],
+      [
+        "key id matches manifest",
+        true,
+        "manifest=bae58d20d2964be6ef068a9ff17772af key=bae58d20d2964be6ef068a9ff17772af"
+      ],
+      [
+        "algorithm is ML-DSA-65",
+        true,
+        ""
+      ],
+      [
+        "signature valid",
+        true,
+        ""
+      ],
+      [
+        "payload.hex matches manifest",
+        true,
+        ""
+      ],
+      [
+        "architecture is SmallCNN",
+        true,
+        "manifest says 'SmallCNN'"
+      ],
+      [
+        "model loads at signed width 32",
+        true,
+        ""
+      ],
+      [
+        "parameter count matches manifest",
+        true,
+        "model 160234, manifest 160234"
+      ],
+      [
+        "weights are finite numbers",
+        true,
+        ""
+      ],
+      [
+        "watermark read (ecc rs32, 512 values)",
+        true,
+        "min margin 2.24, corrected 0, erasures 0"
+      ],
+      [
+        "extracted payload == SHA-256(signed manifest)",
+        true,
+        "256 bits match"
+      ]
+    ]
+  },
+  {
+    "model": "runs\\wm_v1\\lam20_n256_rs32_hinge1.5\\seed3\\model.pt",
+    "verdict": "VERIFIED",
+    "checks": [
+      [
+        "load release files",
+        true,
+        ""
+      ],
+      [
+        "key id matches manifest",
+        true,
+        "manifest=bae58d20d2964be6ef068a9ff17772af key=bae58d20d2964be6ef068a9ff17772af"
+      ],
+      [
+        "algorithm is ML-DSA-65",
+        true,
+        ""
+      ],
+      [
+        "signature valid",
+        true,
+        ""
+      ],
+      [
+        "payload.hex matches manifest",
+        true,
+        ""
+      ],
+      [
+        "architecture is SmallCNN",
+        true,
+        "manifest says 'SmallCNN'"
+      ],
+      [
+        "model loads at signed width 32",
+        true,
+        ""
+      ],
+      [
+        "parameter count matches manifest",
+        true,
+        "model 160234, manifest 160234"
+      ],
+      [
+        "weights are finite numbers",
+        true,
+        ""
+      ],
+      [
+        "watermark read (ecc rs32, 512 values)",
+        true,
+        "min margin 1.50, corrected 0, erasures 0"
+      ],
+      [
+        "extracted payload == SHA-256(signed manifest)",
+        true,
+        "256 bits match"
+      ]
+    ]
+  },
+  {
+    "model": "runs\\wm_v1\\lam20_n256_rs32_hinge1.5\\seed4\\model.pt",
+    "verdict": "VERIFIED",
+    "checks": [
+      [
+        "load release files",
+        true,
+        ""
+      ],
+      [
+        "key id matches manifest",
+        true,
+        "manifest=bae58d20d2964be6ef068a9ff17772af key=bae58d20d2964be6ef068a9ff17772af"
+      ],
+      [
+        "algorithm is ML-DSA-65",
+        true,
+        ""
+      ],
+      [
+        "signature valid",
+        true,
+        ""
+      ],
+      [
+        "payload.hex matches manifest",
+        true,
+        ""
+      ],
+      [
+        "architecture is SmallCNN",
+        true,
+        "manifest says 'SmallCNN'"
+      ],
+      [
+        "model loads at signed width 32",
+        true,
+        ""
+      ],
+      [
+        "parameter count matches manifest",
+        true,
+        "model 160234, manifest 160234"
+      ],
+      [
+        "weights are finite numbers",
+        true,
+        ""
+      ],
+      [
+        "watermark read (ecc rs32, 512 values)",
+        true,
+        "min margin 1.50, corrected 0, erasures 0"
+      ],
+      [
+        "extracted payload == SHA-256(signed manifest)",
+        true,
+        "256 bits match"
+      ]
+    ]
+  }
+]

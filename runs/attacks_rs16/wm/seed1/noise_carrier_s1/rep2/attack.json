@@ -1,0 +1,16 @@
+{
+  "source": "wm",
+  "seed": 1,
+  "attack_id": "noise_carrier_s1",
+  "family": "noise",
+  "params": {
+    "sigma": 1.0,
+    "scope": "carrier"
+  },
+  "rep": 2,
+  "clean_acc": 0.8075,
+  "attacked_acc": 0.6354,
+  "acc_drop": 0.17210000000000003,
+  "layer": "features.6.0.weight",
+  "seconds": 14.017006397247314
+}
