@@ -1,65 +1,54 @@
 # Threat model
 
-## What we protect
-A trained image-classification model and the claim that it was produced by a
-specific developer from a specific, committed dataset.
+## Release record and checkpoint association
 
-## Who is involved
-- Developer: trains the model, signs a manifest, embeds a watermark payload.
-- Auditor: receives the model, public key, signed manifest and watermark key,
-  then verifies authenticity.
+The developer signs a manifest containing a dataset commitment and embeds the
+manifest digest as a keyed weight watermark. The trusted auditor independently
+obtains the signing public key, protects the separate watermark key, and has
+white-box access to the suspect checkpoint. The auditor pins the extraction
+profile to the release, including the carrier layer, mean mode, full payload
+length, ECC variant, and alignment policy. Adjacent run settings are unsigned.
+Use explicit options or trusted settings and leave the legacy short-payload
+override disabled.
 
-## Attackers
-1. Remover: has the model weights and wants to erase the watermark.
-   Capabilities: fine-tuning, pruning, quantization, adding noise,
-   overwriting with a second watermark.
-2. Forger: wants to pass off a model as someone else's.
-   Capabilities: copies the manifest, tries to forge signatures,
-   embeds their own watermark.
-3. Poisoner: alters training data.
-   Capabilities: modifies samples before or after signing.
+A valid ML-DSA-65 signature authenticates the manifest under the trusted key.
+Exact watermark recovery supplies evidence of association with that manifest.
+The optional dataset check compares supplied data with the signed root. Actual
+training inputs, data quality, legal ownership and priority require independent
+evidence. The signer supplies the timestamp.
 
-## What the system claims
-- The model carries a payload bound to a manifest signed by the developer's
-  ML-DSA key.
-- Changing the manifest or dataset commitment breaks verification.
-- The watermark survives the Remover's attacks listed above, within
-  measured limits.
+## Evaluated adversaries
 
-## What the system does NOT claim
-- It does not prove the data was clean before signing.
-- It does not prove the weights were trained on the committed dataset.
-- It does not defend against distillation (out of scope).
-- It requires white-box access to the weights.
+- A remover has the model weights and applies specified modifications.
+  The same-layer overwrite knows the carrier and uses a competing mark with
+  another key. A successful removal requires rejection within five accuracy
+  points of the clean parent. The suite does not evaluate an adaptive
+  verifier-query adversary or exposure of the original watermark key.
+- Selected forgery fixtures exercise wrong keys, altered records and unrelated
+  weights. They are checks on the implementation.
+- Dataset-tampering fixtures change data after commitment and compare the
+  supplied data against the signed root.
 
-## Measured against the Remover (Phase 6 and 6b)
-- Accidental lifecycle changes (fine-tuning, pruning, quantization, noise, output-channel
-  rescaling) never removed the mark while the model stayed useful.
-- Function-preserving obfuscation (Phase 6 found it; Phase 6b fixes it): reordering or
-  positively rescaling the channels that feed the carrier layer leaves the model's answers
-  identical but scrambles the carrier. The verifier now undoes both (Hungarian re-alignment,
-  a linear program for the scales) and still demands an exact 256-bit match. The search only
-  runs when a counting bound proves it cannot fit a codeword the model never carried
-  (2^-239 for rs32); 724 null models in `experiments/phase6b_false_accept.py` gave 0 false
-  accepts.
-- Overwriting with a second watermark on the same layer still destroys the exact payload.
-  The verifier then reports DAMAGED: the code values still agree with our signed codeword
-  far beyond chance (below 2^-64 for an unmarked model, counted without any search). This
-  is evidence of origin, not a proof of the exact payload.
-- Not yet tested: adding dummy neurons (it changes the parameter count, so the signed
-  manifest check rejects the model, which still counts as a removal), overwriting a
-  different layer, much longer fine-tuning, and attacks on the rs16 models.
+## Extraction and evidence
 
-## Operational notes
-- The verifier needs the secret watermark key. Any auditor who receives it learns where
-  the mark lives and could target it, so it is shared only with trusted auditors.
-- During development the team shared the keys (including the ML-DSA secret key) over a
-  chat app and chose to keep them. A real release would need a fresh key pair.
-- `created_utc` in the manifest is chosen by the signer. Nothing proves who signed first,
-  so a priority dispute (two developers each with a valid signature) needs a trusted
-  timestamp (RFC 3161) or a transparency log. Not implemented.
+The verifier tries assignment and positive-scale fitting when eligible, then
+compares the decoded payload with the full manifest digest. The Cover count
+applies to a fixed-order strict scale-sign fit under independent uniform labels.
+It serves as a retry gate. A false-accept bound for the target-adaptive assignment
+and decoder remains open.
 
-## Assumptions
-- The developer's private key is kept secret.
-- The watermark key (seed) is shared only with trusted auditors.
-- The post-quantum security of ML-DSA holds.
+DAMAGED uses only the raw, original-order score after exact recovery fails.
+The cutoff is 358/512 for RS32 or 280/384 for RS16. Each has a binomial tail below
+2^-64 under a prespecified comparison with independent equiprobable hard decisions.
+A zero logit maps to zero. The tail describes the stated null, and DAMAGED reports
+residual agreement. The sampled control cases and structural results are
+summarized in [the manuscript](../paper1/evaluation.tex).
+
+## Limits and key custody
+
+The evidence concerns SmallCNN and CIFAR-10 under a shared release and key.
+Distillation, cross-layer overwriting, substantially longer fine-tuning,
+architecture-changing edits and compromised keys remain outside the study.
+Development signing material was shared within the team. Use separately managed
+release credentials for deployment. A trusted timestamp or transparency log and
+an auditor delegation and revocation mechanism remain outside the implementation.

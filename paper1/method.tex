@@ -1,59 +1,78 @@
-\section{Post-Quantum Provenance Protocol}
+\section{Manifest and Watermark Verification}
 \label{sec:method}
 
 \begin{figure*}[!t]
 \centering\includegraphics[width=0.96\textwidth]{figures/00_architecture.png}
-\caption{End-to-end post-quantum provenance protocol. Top: the developer commits to the ordered CIFAR-10 training set via a SHA-256 Merkle tree, signs a canonical manifest with ML-DSA-65, and embeds its Reed--Solomon-encoded 256-bit digest into \textsc{SmallCNN} via a keyed projection. Bottom: the white-box auditor verifies the signature and tensor integrity, decodes the watermark with soft erasures, applies Cover-bounded alignment when needed, and issues \textsc{Verified}, \textsc{Damaged}, or \textsc{Rejected}.}\label{fig:arch}
+\caption{Release and verification workflow. The developer commits to the dataset, signs the manifest, and embeds its coded digest. The auditor supplies a trusted public key, the secret watermark key, the signed release record, and a pinned extraction profile. After release and structural checks, an exact decode on the raw or retried carrier yields \textsc{Verified}. Otherwise the permitted extraction path evaluates raw agreement for \textsc{Damaged}.}\label{fig:arch}
 \end{figure*}
 
 \subsection{Actors, Threat Model, and Scope}
-Our protocol (Fig.~\ref{fig:arch}) involves two parties: a \textbf{Developer}, who commits to a training dataset, signs a release manifest, and trains a watermarked classifier; and a \textbf{Trusted Auditor}, who holds white-box access to a suspect model checkpoint alongside the developer's public key, signed manifest, and secret watermark key~\cite{projectResults}. We model three adversaries:
-\begin{enumerate}
-  \item \textbf{Remover:} Possesses the model weights and applies post-training modifications---Gaussian noise, magnitude pruning, quantization, fine-tuning, function-preserving channel permutation or scaling, or same-layer watermark overwriting---to erase provenance while keeping classification accuracy within 5 percentage points of the clean watermarked model.
-  \item \textbf{Forger:} Attempts to pass off an unmarked or third-party model as the developer's release by altering manifest fields, forging signatures, or exploiting weak verification rules (such as checking only a short prefix of the payload).
-  \item \textbf{Poisoner:} Modifies, re-labels, or reorders training samples after the dataset commitment has been signed.
-\end{enumerate}
+The developer commits to a dataset, signs the release manifest, and trains a marked classifier. The trusted auditor has white-box access to the checkpoint and obtains the developer's public key through an independent trust channel. The auditor protects the separate watermark key and pins the extraction profile to the release, including layer, carrier mode, Reed--Solomon variant, full 256-bit payload, and alignment policy~\cite{projectResults}. The implementation can take unsigned extraction settings from the CLI or an adjacent run sidecar. An auditor uses explicit settings or an authenticated sidecar from a trusted source, and leaves the legacy short-payload override disabled.
 
-To keep all claims defensible, we state four explicit boundaries: (i)~verification is white-box and assumes a trusted auditor who protects the secret watermark key; (ii)~the dataset Merkle root proves \emph{which} dataset was committed at signing time, not that samples were clean beforehand or that the weights were trained exclusively on those samples; (iii)~model distillation (training a new model from API outputs) is out of scope; and (iv)~manifest timestamps are self-declared, so ownership priority disputes require an external timestamping authority (e.g., RFC~3161) or transparency log.
+Our removal study uses specified post-training modifications on the weights. The overwrite knows the carrier and trains a competing mark with a different key. The protocol does not expose the original key or a verifier-query oracle to these trials. The forgery cases exercise selected invalid inputs such as altered manifests and wrong keys. Dataset-tampering checks compare supplied data to the signed root. Adaptive submissions, key compromise, API-only access, distillation and edits that change the supported architecture are outside the robustness results.
+
+Under the signature assumptions, a valid signature authenticates the manifest to the trusted public key. An exact watermark match supports association of the checkpoint with that record under the extraction profile. The signed root commits to the ordered dataset representation. Comparing a supplied dataset against it is a separate operation from model verification. It does not establish the actual training inputs or their quality. The manifest's timestamp is self-declared. Legal ownership and priority require independent evidence.
 
 \subsection{Dataset Commitment and ML-DSA-65 Manifest Signing}
-To bind all 50,000 ordered CIFAR-10 training images~\cite{cifar10} into a compact commitment, the developer constructs a domain-separated SHA-256 Merkle tree~\cite{merkle1987digital}. Each leaf hashes a domain tag, sample index, label, and raw uint8 pixel bytes:
+The developer computes a SHA-256 Merkle root for the ordered 50,000 CIFAR-10 training images~\cite{cifar10,merkle1987digital}. Each leaf hashes a domain tag, sample index, label, and raw unsigned 8-bit pixel bytes:
 \begin{equation}
-  h_i = \mathrm{SHA256}\bigl(\texttt{0x00} \parallel \mathrm{u64be}(i) \parallel \mathrm{u16be}(y_i) \parallel \mathbf{x}_i\bigr),
+  h_i = \mathrm{SHA256}\bigl(\texttt{0x00} \parallel \mathrm{u64be}(i)
+      \parallel \mathrm{u16be}(y_i) \parallel \mathbf{x}_i\bigr).
 \end{equation}
-while internal nodes hash $\texttt{0x01} \parallel h_{\mathrm{left}} \parallel h_{\mathrm{right}}$ (promoting odd nodes unchanged). Domain separation prevents second-preimage confusion between leaves and internal nodes, and embedding the index $i$ prevents silent sample reordering.
+An internal node hashes $\texttt{0x01} \parallel h_{\mathrm{left}} \parallel h_{\mathrm{right}}$ and an odd node is promoted unchanged. Tags distinguish leaf and node inputs. Including the index and label binds the commitment to the ordering and labels under the hash assumptions.
 
-The resulting 32-byte root is placed in a canonical JSON manifest (sorted keys, no extraneous whitespace) containing the developer identifier, public-key identifier ($\mathrm{SHA256}(pk)_{[0:16]}$), architecture (\textsc{SmallCNN}, width 32, 160,234 parameters), watermark payload bit length (256), and UTC timestamp. The developer signs the exact canonical manifest bytes $M$ using \textbf{ML-DSA-65} (NIST FIPS~204~\cite{nist204}), producing a 3,309-byte signature verifiable under a 1,952-byte public key. Because embedding 26,472 signature bits directly inside a 160k-parameter network is impractical, the signed manifest ships beside the release while the watermark payload is defined as the full 256-bit digest
+The 32-byte root is stored in a canonical JSON manifest with the developer identifier, key identifier (the first 16 bytes of SHA-256 of the public key), architecture, width, parameter count, payload length, and a UTC timestamp. The project serializes JSON with sorted keys, compact separators, and ASCII escaping before UTF-8 encoding. The developer signs the canonical bytes $M$ with ML-DSA-65~\cite{nist204}. The 3,309-byte signature and 1,952-byte public key remain external to the weights. The watermark payload is
 \begin{equation}
   p = \mathrm{SHA256}(M) \in \{0,1\}^{256}.
 \end{equation}
-Excluding $p$ from $M$ avoids circularity, while ensuring that altering any manifest field flips roughly half of the embedded payload bits.
+The digest is computed from the manifest after serialization and is stored separately, avoiding a circular definition.
 
 \subsection{Error-Corrected Projection Watermarking}
-Before training, the 32-byte payload $p$ is encoded with a systematic Reed--Solomon (RS) code over $\mathrm{GF}(256)$~\cite{reed1960polynomial}: \textbf{RS32} appends 32 parity bytes to yield $n=512$ binary codeword bits (correcting $e$ byte errors and $f$ erasures whenever $2e+f \le 32$), whereas \textbf{RS16} appends 16 parity bytes to yield $n=384$ bits ($2e+f \le 16$).
+A systematic Reed--Solomon code over $\mathrm{GF}(256)$ encodes the 32-byte payload~\cite{reed1960polynomial}. RS32 appends $r=32$ parity bytes ($n=512$ bits) and RS16 appends $r=16$ ($n=384$ bits). Bounded-distance decoding can correct $e$ unknown symbol errors and $f$ known erasures when $2e+f\le r$.
 
-Following Uchida \emph{et al.}~\cite{uchida2017embedding}, we select the final convolutional layer (\texttt{features.6.0.weight}, shape $128 \times 64 \times 3 \times 3$) and average across its 128 output filters to obtain a 576-element carrier vector $v \in \mathbb{R}^{576}$ ($C=64$ input channels $\times K=9$ spatial taps). Output-channel averaging makes the carrier intrinsically invariant to permuting the carrier's output filters. A 32-byte secret watermark key is expanded deterministically with SHAKE-256 into a projection matrix $X \in \{-1,+1\}^{n \times 576}$, producing raw projection logits $z = Xv \in \mathbb{R}^n$.
+Following Uchida \emph{et al.}~\cite{uchida2017embedding}, the implementation averages the 128 output filters of the final convolutional layer, \texttt{features.6.0.weight}, yielding $v\in\mathbb{R}^{576}$ with $C=64$ input-channel blocks of $K=9$ coordinates. Output-filter permutation leaves this mean invariant in exact arithmetic. The projection matrix $X\in\{-1,+1\}^{n\times576}$ is derived by hashing a domain-separated input containing the 32-byte watermark key and projection configuration, then expanding it using SHAKE-256. Extraction uses the logits $z=Xv$.
 
-Let $s_i = 2b_i - 1 \in \{-1,+1\}$ denote the signed target for codeword bit $b_i \in \{0,1\}$. The model is trained jointly with classification cross-entropy $\mathcal{L}_{\mathrm{CE}}$ and a weighted watermark objective $\mathcal{L}_{\mathrm{total}} = \mathcal{L}_{\mathrm{CE}} + \lambda \mathcal{L}_{\mathrm{wm}}$ comparing two formulations:
+For expected code bits $b_i$, let $s_i=2b_i-1$. Training minimizes task cross-entropy plus $\lambda\mathcal{L}_{\mathrm{wm}}$, with
 \begin{align}
-  \mathcal{L}_{\mathrm{BCE}} &= \frac{1}{n}\sum_{i=1}^{n} \log\!\bigl(1 + \exp(-s_i z_i)\bigr), \label{eq:bce}\\
-  \mathcal{L}_{\mathrm{hinge}} &= \frac{1}{n}\sum_{i=1}^{n} \max\bigl(0,\, m - s_i z_i\bigr). \label{eq:hinge}
+ \mathcal{L}_{\mathrm{BCE}} &= \frac{1}{n}\sum_{i=1}^{n}
+       \log\!\bigl(1+\exp(-s_i z_i)\bigr), \label{eq:bce}\\
+ \mathcal{L}_{\mathrm{hinge}} &= \frac{1}{n}\sum_{i=1}^{n}
+       \max(0,m-s_i z_i). \label{eq:hinge}
 \end{align}
-Both penalize sign errors, but their gradients diverge sharply once a bit is correctly embedded. Because $\mathcal{L}_{\mathrm{BCE}}$ never vanishes, SGD continues enlarging the shared mean filter $v$ until weight decay counterbalances it, crowding out per-filter discriminative features. In contrast, $\mathcal{L}_{\mathrm{hinge}}$ contributes zero loss and zero gradient once $s_i z_i \ge m$, preserving classification capacity at the expense of leaving individual projection scores close to the boundary $m$.
+BCE continues to reward larger signed logits. The implemented hinge term contributes zero watermark gradient for a bit at or above $m$. The task loss and weight decay can still change those logits.
 
-\subsection{White-Box Verification, Obfuscation Recovery, and Verdicts}
-Given a suspect checkpoint, release manifest, trusted public key, and watermark key, the auditor runs a strict staged pipeline~\cite{projectResults}:
-\begin{enumerate}
-  \item \textbf{Cryptographic and structural checks:} Verify the ML-DSA-65 signature on $M$, verify key-ID consistency, load checkpoint tensors safely without Python unpickling (rejecting crafted pickle payloads), check exact parameter count at signed width 32, reject any \texttt{NaN}/\texttt{Inf} weights, and enforce full 256-bit payload verification (preventing short-prefix forgery).
-  \item \textbf{Soft-erasure RS decoding:} Compute $z = Xv$, map signs $\mathbb{I}[z_i > 0]$ to received bytes, and assign each byte a confidence equal to its smallest bit magnitude $\min_{j \in \text{byte}} |z_j|$. Plain RS decoding is tried first, followed by erasing the $2, 4, \dots, p/2$ least-confident bytes. Capping erasures at $p/2$ retains $p/2$ parity bytes for error detection; without this cap, pure Gaussian noise ``decoded'' 1,000/1,000 times, whereas with the cap 0/1,000 noise inputs decode. Exact recovery requires the decoded 256 bits to match $\mathrm{SHA256}(M)$ identically, yielding \textsc{Verified}.
-  \item \textbf{Cover-bounded structural-obfuscation recovery:} Permuting or positively rescaling the $C=64$ input channels feeding the carrier conv (compensated in the preceding BatchNorm/conv block, as in~\cite{yan2023rethinking}) preserves the classifier's exact function while scrambling $v$. Viewing $v$ as $C$ blocks $v_c \in \mathbb{R}^K$ and writing $A = (X^\top s) \in \mathbb{R}^{C \times K}$, the alignment score of channel permutation $\pi$ decomposes linearly across slots:
-  \begin{equation}
-    \sum_{j=1}^{n} s_j (X v_\pi)_j = \sum_{c=1}^{C} A_c \cdot v_{\pi(c)},
-  \end{equation}
-  which the verifier solves exactly via the Hungarian algorithm~\cite{kuhn1955hungarian}. To reverse positive per-channel scaling $v_c \mapsto v_c / s_c$, the verifier solves a 65-variable, $n$-constraint HiGHS linear program maximizing worst-case margin $t$ over positive scales $a_1, \dots, a_C \ge 10^{-3}$ subject to $\sum_{c=1}^{C} a_c = C$ and $\sum_{c=1}^{C} a_c s_j (X_{j,c} \cdot v_c) \ge t$ for all $j$, plus a combined pass applying Hungarian matching to $\ell_2$-normalized blocks followed by scale LP. Each candidate is accepted \emph{only} if RS decoding yields an exact 256-bit match with $\mathrm{SHA256}(M)$. Crucially, alignment is permitted only when Cover's function-counting bound~\cite{cover1965geometrical},
-  \begin{equation}
-    \log_2 P_{\mathrm{cover}}(n, C) = \log_2\!\left(2^{1-n}\sum_{k=0}^{C-1}\binom{n-1}{k}\right) \le -64,
-  \end{equation}
-  proves that $C$ linear scale degrees of freedom cannot spuriously realize an arbitrary $n$-bit sign pattern. For $C=64$, this bound is $2^{-239.7}$ for RS32 ($n=512$) and $2^{-139.9}$ for RS16 ($n=384$), whereas a legacy 32-bit code over $C=16$ channels yields $2^{-1.0}$ and is automatically refused.
-  \item \textbf{Residual-evidence verdict (\textsc{Damaged}):} If exact decoding fails after signature and structural checks pass (e.g., following a watermark overwrite), the auditor counts raw sign agreements $k = \sum_{j=1}^{n}\mathbb{I}[s_j z_j > 0]$ in the checkpoint's \emph{original, unaligned} channel order. Under an unmarked null model, $k \sim \mathrm{Binomial}(n, 1/2)$. For RS32 ($n=512$), observing $k \ge 358$ has exact upper-tail probability $2^{-64.2} < 2^{-64}$ and yields \textsc{Damaged}---statistical evidence that the model derives from the signed release despite exact-payload destruction. Insufficient evidence or any failed cryptographic/structural check yields \textsc{Rejected}.
-\end{enumerate}
+\subsection{Release Checks and Exact Decoding}
+The verifier checks the ML-DSA-65 signature, key identifier and consistency of the shipped payload file with the manifest. It loads the checkpoint at the signed architecture and width, checks the parameter count, and checks floating-point tensors for finiteness. The study assumes a PyTorch version supporting restricted \texttt{weights\_only} loading. The legacy fallback after an unsupported-argument error falls outside this loading assumption. The expected payload is recomputed from the signed manifest.
+
+The decoder compares each logit with zero, with a zero logit read as bit zero. It packs the bits in bytes and rates byte confidence by the smallest absolute logit in that byte. It tries hard RS decoding first, then erases the 2, 4, \ldots, $r/2$ least-confident bytes until the decoder succeeds or the schedule is exhausted. Confidence ranking is a heuristic for locating byte errors. Each extraction attempt stops on the first successful decoder return. \textsc{Verified} requires agreement with the entire expected 256-bit digest, including after a retry.
+
+\subsection{Structural Extraction Retries}
+Under compensated channel permutations and positive input scalings, the corresponding block permutation and inverse scaling preserve the model function in exact arithmetic for the studied architecture~\cite{yan2023rethinking}. The verifier tries up to three extractions after a raw failure: a linear assignment of channel blocks, max-min positive-scale fitting in the original order, and assignment on normalized blocks followed by scale fitting when that assignment moves blocks. For a permutation $\pi$, define $A=X^\top s$ reshaped into channel blocks. The assignment maximizes
+\begin{equation}
+ \sum_{j=1}^{n}s_j(Xv_\pi)_j
+    =\sum_{c=1}^{C} A_c\cdot v_{\pi(c)}.
+ \label{eq:assignment}
+\end{equation}
+This is the linear assignment problem associated with the Hungarian method~\cite{kuhn1955hungarian}. The implementation calls SciPy's assignment solver. Maximizing this score gives no guarantee of recovering the original order or of satisfying every sign constraint.
+
+For a fixed order, let $g_{jc}=X_{j,c}\cdot v_c$, where $X_{j,c}$ is the block of projection row $j$ for channel $c$. The scale retry uses a HiGHS linear program that maximizes $t$ subject to $\sum_c a_c=C$, $a_c\ge10^{-3}$, and $s_j\sum_c g_{jc}a_c\ge t$ for each $j$, after positive normalization of the coefficient matrix. The implemented search may decode the fitted carrier even when $t\le 0$. The floor restricts the fitted scales. Recovery under these procedures is reported for the evaluated cases in Section~\ref{sec:evaluation}.
+
+\paragraph{Scope of the eligibility rule}
+For the $n$ fixed rows $g_j$ in $C$ dimensions, let the target signs be drawn uniformly and independently from $\{-1,+1\}^n$, independently of the rows. We condition on the rows and their ordering. Cover's homogeneous dichotomy count is exact in general position and upper-bounds the number of realizable strict sign patterns otherwise~\cite{cover1965geometrical}. The probability that any real scale vector realizes a random target with all signed scores strictly positive is therefore at most
+\begin{equation}
+ B(n,C)=2^{1-n}\sum_{k=0}^{C-1}\binom{n-1}{k}.
+ \label{eq:cover}
+\end{equation}
+Ties are excluded. The positive, normalized scales considered by the LP form a subset of the unrestricted scale vectors. The implementation uses $B(n,C)\le2^{-64}$ as an eligibility rule for full-payload mean-mode retries. At $C=64$, $\log_2 B$ is $-239.71$ for RS32 and $-139.86$ for RS16.
+
+The actual target is derived from a manifest and has Reed--Solomon structure. The assignment depends on that target, and decoder acceptance can follow incorrect raw signs or erasures. Equation~\eqref{eq:cover} addresses a fixed-order strict-fit event under its stated label model. A false-accept bound for the implemented extraction and decoding procedure remains open.
+
+\subsection{Residual Agreement and Verdicts}
+When release and structural checks pass and the usual full-payload decode or comparison fails, the verifier counts agreement in the original channel order:
+\begin{equation}
+ k=\sum_{j=1}^{n}\mathbf{1}\{\mathbf{1}[z_j>0]=b_j\}.
+ \label{eq:agreement}
+\end{equation}
+For one prespecified comparison, suppose the checkpoint, profile and target word are fixed before drawing independent, symmetric projection rows, and the logit has zero probability of a tie. Then the hard decisions are independent fair bits and $k$ has the $\mathrm{Binomial}(n,1/2)$ distribution. For example, this is an idealized fresh-projection model for a checkpoint independent of the draw. The implementation uses a fixed key and deterministic projection expansion for a release, so this model does not describe arbitrary fixed-key, adaptively selected, or repeated comparisons. A zero logit counts as agreement only for an expected zero bit.
+
+The \textsc{Damaged} cutoffs are $k\ge358$ for RS32 and $k\ge280$ for RS16. At the respective cutoffs the exact binomial upper tails are approximately $2^{-64.1921}$ and $2^{-64.2083}$, each below $2^{-64}$. These are null probabilities for the raw-score event. Exact matches take precedence, and the tails do not give a probability of checkpoint origin. Failed release or structural checks, insufficient residual agreement, and extraction errors yield \textsc{Rejected}.

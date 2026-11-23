@@ -11,7 +11,7 @@ Writes results/phase7/plots/{false_positive,robustness_curves,naive_vs_projectio
        results/phase7/false_positive_summary.csv, results/phase7/scheme_comparison.csv and docs/phase7_results.md.
 
 Agreement = how many of the 512 code values read the way the signed codeword says, in the model's own channel order
-(no re-alignment). For a model that never carried the codeword it is Binomial(512, 1/2); DAMAGED needs >= 358.
+(no re-alignment). Under an ideal null with independent, fair hard decisions it is Binomial(512, 1/2). DAMAGED needs >= 358.
 """
 import argparse
 import json
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from embedding.align import evidence_threshold, log2_cover_fraction, log2_tail  # noqa: E402
+from embedding.align import evidence_threshold  # noqa: E402
 
 N = 512
 VERDICT_COLOR = {"VERIFIED": "#2e8b57", "DAMAGED": "#e0a030", "REJECTED": "#c0392b"}
@@ -82,7 +82,7 @@ def false_positive(fa_csv, att_csv, outdir):
         ax.hist(allv, bins=np.arange(180, 380, 4), density=True, color="#4c78a8", alpha=0.75,
                 label="%d models without our mark" % allv.size)
         ax.plot(ks, pmf * 1, color="black", lw=1.2, label="Binomial(512, 1/2), exact")
-        ax.axvline(need, color="#e0a030", lw=2, label="DAMAGED threshold %d (chance < 2^-64)" % need)
+        ax.axvline(need, color="#e0a030", lw=2, label="DAMAGED threshold %d" % need)
         ax.set(xlim=(180, 520), xlabel="code values agreeing with our signed codeword (of 512)", ylabel="share of models",
                title="False-positive study: worst unmarked model %d, threshold %d" % (allv.max(), need))
         ax.legend(fontsize=8)
@@ -103,7 +103,6 @@ def robustness_curves(att_csv, outdir):
     d["agree"] = (1 - pd.to_numeric(d["flip_rate"], errors="coerce")) * N
     fams = [f for f in CURVES if f in set(d["family"])]
     fig, axes = plt.subplots(1, len(fams), figsize=(3.6 * len(fams), 3.8), squeeze=False)
-    need = evidence_threshold(N)
     for ax, fam in zip(axes[0], fams):
         sub = d[d["family"] == fam]
         if fam == "noise":
@@ -118,7 +117,6 @@ def robustness_curves(att_csv, outdir):
             ax2.plot(g["strength"], 100 * g["acc"], ls, color="#7f7f7f", lw=1, alpha=0.8)
             for _, r in s.iterrows():
                 ax.scatter(r["strength"], r["agree"], s=18, color=VERDICT_COLOR.get(r["verdict"], "grey"), zorder=3)
-        ax.axhline(need, color="#e0a030", lw=0.8, ls=":")
         ax.axhline(N / 2, color="grey", lw=0.6, ls=":")
         ax.set(ylim=(200, 520), xlabel=CURVES[fam][1], title=fam)
         if CURVES[fam][2]:
@@ -128,12 +126,12 @@ def robustness_curves(att_csv, outdir):
         ax2.set_ylim(0, 100)
         ax2.tick_params(labelsize=7)
         if ax is axes[0][0]:
-            ax.set_ylabel("code values still right (of 512)")
+            ax.set_ylabel("matches to clean signs (of 512)")
         if ax is axes[0][-1]:
             ax2.set_ylabel("test accuracy % (grey)")
     handles = [plt.Line2D([], [], marker="o", ls="", color=c, label=v) for v, c in VERDICT_COLOR.items()]
     fig.legend(handles=handles, loc="lower center", ncol=3, fontsize=8, frameon=False)
-    fig.suptitle("Robustness curves (Phase 6b verifier): agreement in the model's own channel order, dot colour = verdict", fontsize=10)
+    fig.suptitle("Robustness curves (Phase 6b verifier): clean-sign agreement and saved verdict", fontsize=10)
     fig.tight_layout(rect=(0, 0.06, 1, 0.95))
     fig.savefig(outdir / "robustness_curves.png", dpi=170)
     plt.close(fig)
@@ -252,21 +250,21 @@ def main():
 
     summ, need, worst, n_null = false_positive(Path(args.false_accept), Path(args.attacks), outdir)
     md += ["## P7.2 False-positive study", "",
-           "Decision rules and their exact false-accept bounds for a model that never carried our codeword (512 code values):", "",
-           "| Rule | Bound |", "|---|---|",
-           "| VERIFIED, raw reading: Reed-Solomon decodes to exactly the signed 256-bit payload | negligible (a random word must land in the decoding radius of one specific codeword) |",
-           "| VERIFIED after undoing channel scaling: 64 positive factors fit all 512 signs | 2^%.1f (Cover's function counting) |" % log2_cover_fraction(N, 64),
-           "| DAMAGED: at least %d of 512 agree, counted in the model's own order | 2^%.1f (exact binomial tail) |" % (need, log2_tail(N, need)), "",
-           "Measured on every population of models without our mark:", "",
+           "The RS32 control study measures sampled extraction and verifier outcomes. "
+           "The retry gate uses a conditional Cover bound for a fixed-order strict fit with independent uniform labels. "
+           "The raw DAMAGED threshold is 358/512 for RS32 and 280/384 for RS16. Under a prespecified comparison with "
+           "independent fair hard decisions their upper tails are below 2^-64. Neither calculation bounds the full verifier.", "",
+           "Observed cases (several cohorts reuse trained checkpoints):", "",
            md_table(summ, ["population", "models", "false_verified", "false_damaged", "max_agree", "mean_agree"]), "",
-           ("Worst agreement over %d null models: **%d of 512** (threshold %d). 0 false VERIFIED, 0 false DAMAGED." % (n_null, worst, need)
+           ("Worst agreement over %d extraction controls: **%d of 512** (threshold %d). 0 false VERIFIED, 0 false DAMAGED." % (n_null, worst, need)
             if worst is not None else "No false-accept data yet."), "", "![false positives](../results/phase7/plots/false_positive.png)", ""]
 
     d = robustness_curves(Path(args.attacks), outdir)
     if d is not None:
         md += ["## P7.3 Robustness curves", "",
-               "Agreement with the signed codeword (in the model's own channel order) against attack strength; dot colour = verdict, "
-               "grey = test accuracy. These curves show the original BCE/RS32 design. The verifier can reverse channel scaling before decoding.", "",
+               "The curves use recorded agreement with the clean checkpoint's signs, computed as 512 × (1 − flip rate). "
+               "Dot color gives the saved verdict and grey gives test accuracy. The historical plot's horizontal threshold is a "
+               "reference for the separate expected-codeword statistic.", "",
                "![robustness](../results/phase7/plots/robustness_curves.png)", ""]
 
     t = comparison(Path(args.naive), Path(args.attacks), outdir, args.useful_drop)
@@ -281,28 +279,29 @@ def main():
                 cost.append(100 * (none["acc"].iloc[0] - base["acc"].iloc[0]))
         removed = lambda pre: ", ".join(t[t[pre + "_outcome"] == "removed"]["attack_id"]) or "none"      # noqa: E731
         md += ["## P7.4 Comparison with the naive sign-based scheme", "",
-               "Naive scheme (the project's first design): bit = sign of one key-chosen weight. Built as fairly as possible: same "
-               "layer, same 256-bit signed payload, same rs32 codeword, same soft decoding and decision rule, the same weight "
-               f"attacks. The naive results cover {nv.seed.nunique()} seeds with one draw per random attack. "
-               "Projection results cover three seeds with three draws per random attack. Rates below give each attack configuration equal weight.", "",
+               "The naive method stamps the sign of one keyed weight per coded bit onto a trained model. "
+               "It shares the layer, payload and RS32 code with the projection pipeline. Projection trains jointly and can "
+               f"retry with alignment. Naive uses {nv.seed.nunique()} seeds with one draw per stochastic setting. "
+               f"Projection uses three seeds and three draws. Each of the {len(t)} common configurations has equal weight.", "",
                "| | naive sign-based | projection (ours) |", "|---|---|---|",
                "| Accuracy cost of embedding | %s | −3.10 pts (paired, 3 seeds) |" % (("%+.2f pts (mean of %d seeds)" % (np.mean(cost), len(cost))) if cost else "—"),
                "| Attack types that removed it (model still useful) | %d: %s | %d: %s |" % ((t["naive_outcome"] == "removed").sum(), removed("naive"),
                                                                                        (t["proj_outcome"] == "removed").sum(), removed("proj")),
-               "| Copies VERIFIED exactly, all attacks | %s | %s |" % (pct(t["naive_verified"].mean()), pct(t["proj_verified"].mean())),
+               "| Exact verification across common configurations | %s | %s |" % (pct(t["naive_verified"].mean()), pct(t["proj_verified"].mean())),
                "| Copies traced (VERIFIED or DAMAGED) | %s | %s |" % (pct(t["naive_detected"].mean()), pct(t["proj_detected"].mean())), "",
                md_table(t, ["attack_id", "naive_outcome", "naive_verified", "naive_detected", "proj_outcome", "proj_verified", "proj_detected"],
                         {k: pct for k in ("naive_verified", "naive_detected", "proj_verified", "proj_detected")}), "",
                "![naive vs projection](../results/phase7/plots/naive_vs_projection.png)", ""]
 
     md += ["## Paper figures and remaining work", "",
-           "Run `python -m experiments.phase7.paper_figures` to regenerate the eight 300-DPI PNGs. "
-           "[Paper figures](../results/phase7/paper_figures/)", "",
+           "The [revised manuscript figures](../paper1/figures/) use recorded structural verdicts. "
+           "Run `python paper1/render_audit_figures.py` to regenerate the five revised images. "
+           "The historical PNGs remain under [results](../results/phase7/paper_figures/).", "",
            "The paper covers SmallCNN on CIFAR-10. Future work includes 19 BCE runs "
            "(3 without ECC, 10 varying watermark strength, 6 varying payload length). "
            "The current data support a single-seed strength comparison and measured error correction under quantization. "
            "A matched payload-length comparison remains open.", "",
-           "The manuscript, three-minute demo and mentor Q&A remain to be prepared.", ""]
+           "See the [audit changelog](../audit/FIXES_CHANGELOG.md) for changes and validation.", ""]
     Path(args.out).write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))
     print("\nwrote", args.out, "and plots in", outdir)

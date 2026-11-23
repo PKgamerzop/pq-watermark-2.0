@@ -1,6 +1,8 @@
-"""Generate publication-grade 300-DPI paper figures:
+"""Regenerate the historical Phase 7 figures:
     python -m experiments.phase7.paper_figures
-    python -m experiments.phase7.paper_figures --also-copy paper1/figures
+
+Use paper1/render_audit_figures.py for the revised manuscript. The historical
+Figure 8A uses an inferred alignment-disabled series for three settings.
 
 Outputs 8 figures in results/phase7/paper_figures/:
   00_architecture.png              End-to-end ML-DSA-65 + Merkle + RS projection + Cover-bounded verifier
@@ -509,7 +511,7 @@ def alignment_and_naive(outdir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(OUT), help="Output directory for PNG figures")
-    ap.add_argument("--also-copy", default="", help="Optional second directory to copy PNGs into (e.g. paper1/figures)")
+    ap.add_argument("--also-copy", default="", help="Optional second directory for historical PNGs")
     args = ap.parse_args()
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)

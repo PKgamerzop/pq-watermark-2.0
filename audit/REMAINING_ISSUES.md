@@ -1,0 +1,16 @@
+# Remaining issues for IEEE editorial and technical review
+
+This branch addresses the unsupported claims and inferred Figure 8A values identified in the audit. It is an evidence-grounded draft for subsequent review. The original evidence is pinned to `fc526ae62ad030c07e51b57e6406acd837154ea3` in `PKgamerzop/pq-watermark-2.0`.
+
+| Priority | Open item | Verification needed |
+|---|---|---|
+| CRITICAL for a future full-verifier security claim | Full alignment-plus-ECC false acceptance remains unproved. A fixed-order strict-fit count and a raw one-shot null do not cover the complete decision procedure. | Define the attacker and trial budget, account for target-dependent candidate selection, ties, decoder acceptance, and profile selection, and prove a bound for that event. The current draft omits the stronger claim. |
+| IMPORTANT | Matched Figure 8A retry ablation remains unperformed. The archived Phase 6 outcomes use an earlier verifier, and the saved Phase 6b JSONs omit the selected candidate. | With controlled access to the corresponding research watermark key and working liboqs, use the same saved checkpoints, trust inputs, and extraction profile for both settings. Save verdict, candidate, corrections, erasures, and raw agreement. |
+| IMPORTANT | Local crypto-dependent unit tests were skipped and the standalone ML-DSA and CIFAR-10 smoke files were excluded. | Run with the correct liboqs binding and a prepared dataset. The independent public-signature check validates the checked-in release only. |
+| IMPORTANT | The evidence uses three robustness parents per design, one release and key, and one overwrite draw per parent at each strength. RS32 controls reuse checkpoints. The effect of carrier norm and margin remains observational. | Add held-out keys and releases, more independent trainings and attacker draws, and matched-margin and strength controls. Report uncertainty at the trained-model or key/release level. |
+| IMPORTANT | The naive baseline compares pipelines with different evaluation coverage and retry logic. The benchmark uses one architecture and dataset. | Match seeds, repeats and attack budgets, add a matched no-ECC comparison, and evaluate other architectures and datasets. Keep distillation, adaptive queries, architecture-changing edits, and compromised keys as separate settings. |
+| IMPORTANT | Ownership, actual training data, timestamp priority, profile authentication and key management extend beyond the prototype. | Specify operational trust, key custody, revocation, and independent evidence needed for these uses. Pin a research environment and provide controlled artifact access. |
+| IMPORTANT | Final venue and primary-reference checks remain. The cited reference set is scoped and does not establish priority. | Confirm proceedings and patent metadata flagged in the original matrix against publisher records. Choose the IEEE venue, verify its page and anonymity policies, and review underfull messages and figure legibility at target size. |
+| OPTIONAL | Historical figures and older reports still reflect their original wording. | Use `paper1/main.tex` and `paper1/figures/` for the revised paper. Keep earlier materials for provenance and label them as historical when sharing them. |
+
+See [the fixes changelog](FIXES_CHANGELOG.md) for the resolution table and actual test outcomes.

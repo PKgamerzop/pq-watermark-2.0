@@ -47,15 +47,9 @@ Only seed 0 exists for most lambda values, ECC off at 256 bits was never trained
 
 ## P7.2 False-positive study
 
-Decision rules and their exact false-accept bounds for a model that never carried our codeword (512 code values):
+The RS32 control study measures sampled extraction and verifier outcomes. The retry gate uses a conditional Cover bound for a fixed-order strict fit with independent uniform labels. The raw DAMAGED threshold is 358/512 for RS32 and 280/384 for RS16. Under a prespecified comparison with independent fair hard decisions their upper tails are below 2^-64. Neither calculation bounds the full verifier.
 
-| Rule | Bound |
-|---|---|
-| VERIFIED, raw reading: Reed-Solomon decodes to exactly the signed 256-bit payload | negligible (a random word must land in the decoding radius of one specific codeword) |
-| VERIFIED after undoing channel scaling: 64 positive factors fit all 512 signs | 2^-239.7 (Cover's function counting) |
-| DAMAGED: at least 358 of 512 agree, counted in the model's own order | 2^-64.2 (exact binomial tail) |
-
-Measured on every population of models without our mark:
+Observed cases (several cohorts reuse trained checkpoints):
 
 | population | models | false_verified | false_damaged | max_agree | mean_agree |
 |---|---|---|---|---|---|
@@ -67,25 +61,25 @@ Measured on every population of models without our mark:
 | random init | 100 | 0 | 0 | 289 | 256.1 |
 | attacked baselines (Phase 6b) | 54 | 0 | 0 | — | — |
 
-Worst agreement over 724 null models: **305 of 512** (threshold 358). 0 false VERIFIED, 0 false DAMAGED.
+Worst agreement over 724 extraction controls: **305 of 512** (threshold 358). 0 false VERIFIED, 0 false DAMAGED.
 
 ![false positives](../results/phase7/plots/false_positive.png)
 
 ## P7.3 Robustness curves
 
-Agreement with the signed codeword (in the model's own channel order) against attack strength; dot colour = verdict, grey = test accuracy. These curves show the original BCE/RS32 design. The verifier can reverse channel scaling before decoding.
+The curves use recorded agreement with the clean checkpoint's signs, computed as 512 × (1 − flip rate). Dot color gives the saved verdict and grey gives test accuracy. The historical plot's horizontal threshold is a reference for the separate expected-codeword statistic.
 
 ![robustness](../results/phase7/plots/robustness_curves.png)
 
 ## P7.4 Comparison with the naive sign-based scheme
 
-Naive scheme (the project's first design): bit = sign of one key-chosen weight. Built as fairly as possible: same layer, same 256-bit signed payload, same rs32 codeword, same soft decoding and decision rule, the same weight attacks. The naive results cover 2 seeds with one draw per random attack. Projection results cover three seeds with three draws per random attack. Rates below give each attack configuration equal weight.
+The naive method stamps the sign of one keyed weight per coded bit onto a trained model. It shares the layer, payload and RS32 code with the projection pipeline. Projection trains jointly and can retry with alignment. Naive uses 2 seeds with one draw per stochastic setting. Projection uses three seeds and three draws. Each of the 36 common configurations has equal weight.
 
 | | naive sign-based | projection (ours) |
 |---|---|---|
 | Accuracy cost of embedding | -0.09 pts (mean of 2 seeds) | −3.10 pts (paired, 3 seeds) |
 | Attack types that removed it (model still useful) | 6: noise_carrier_s1, prune_global_0.5, permute_out_carrier, permute_in_carrier, permute_all, permute_scale_in_x10 | 0: none |
-| Copies VERIFIED exactly, all attacks | 26% | 86% |
+| Exact verification across common configurations | 26% | 86% |
 | Copies traced (VERIFIED or DAMAGED) | 61% | 99% |
 
 | attack_id | naive_outcome | naive_verified | naive_detected | proj_outcome | proj_verified | proj_detected |
@@ -131,8 +125,8 @@ Naive scheme (the project's first design): bit = sign of one key-chosen weight. 
 
 ## Paper figures and remaining work
 
-Run `python -m experiments.phase7.paper_figures` to regenerate the eight 300-DPI PNGs. [Paper figures](../results/phase7/paper_figures/)
+The [revised manuscript figures](../paper1/figures/) use recorded structural verdicts. Run `python paper1/render_audit_figures.py` to regenerate the five revised images. The historical PNGs remain under [results](../results/phase7/paper_figures/).
 
 The paper covers SmallCNN on CIFAR-10. Future work includes 19 BCE runs (3 without ECC, 10 varying watermark strength, 6 varying payload length). The current data support a single-seed strength comparison and measured error correction under quantization. A matched payload-length comparison remains open.
 
-The manuscript, three-minute demo and mentor Q&A remain to be prepared.
+See the [audit changelog](../audit/FIXES_CHANGELOG.md) for changes and validation.

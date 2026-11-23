@@ -2,21 +2,23 @@
 \label{sec:evaluation}
 
 \subsection{Experimental Setup}
-We evaluate on the standard CIFAR-10 split (50,000 training and 10,000 test images~\cite{cifar10}) using \textsc{SmallCNN} (width 32, five $3\times 3$ Conv--BatchNorm--ReLU blocks, three max-pooling stages, dropout 0.3, and a 10-class linear head; 160,234 parameters). Training uses random crop (padding 4) and horizontal flip augmentation, SGD with Nesterov momentum 0.9, weight decay $5\times 10^{-4}$, batch size 128, and a 30-epoch cosine learning-rate schedule starting at 0.05 on a Tesla T4 GPU. Unless noted, watermarked runs use \texttt{features.6.0.weight} in mean mode, $\lambda=20$, full 256-bit payload, and hinge margin $m=1.5$.
+We use CIFAR-10's 50,000 training and 10,000 test images~\cite{cifar10} and \textsc{SmallCNN} (width 32, five $3\times3$ Conv--BatchNorm--ReLU blocks, three max-pooling stages, dropout 0.3, and a ten-class head). Training uses random crop (padding 4), horizontal flip, SGD with Nesterov momentum 0.9 and weight decay $5\times10^{-4}$, batch size 128, and a 30-epoch cosine schedule starting at 0.05. The reported Colab training setup uses a Tesla T4. The main watermark runs use the final convolution in mean mode, $\lambda=20$, a full 256-bit payload, and $m=1.5$ for hinge.
 
-Clean accuracy comparisons pair Baseline, BCE/RS32, and Hinge~1.5/RS32 across five seeds (0--4), and BCE/RS16 across seeds 0--2 (paired against the matching baseline seeds). Robustness evaluations cover seeds 0--2 across all three designs using a unified suite of 47 modifications plus clean controls (252 checkpoint evaluations per design, including three random repeats for stochastic attacks): Gaussian noise (all weights $\sigma \in [0.01, 0.5]$ and carrier-only $\sigma \in [0.1, 1.0]$), global and per-layer magnitude pruning (10\%--95\%), prune+fine-tune (50\%/80\% + 3 epochs), quantization (FP16, per-tensor 8/6/4/3/2-bit, per-channel 8/4-bit), fine-tuning (up to 10 epochs at lr 0.05 on 100\% of CIFAR-10), output/input channel rescaling (up to $\times 100$), output/input/full channel permutation, combined permutation + $\times 10$ scaling, and same-layer watermark overwriting (128-bit and 512-bit attacker marks trained for 10 epochs at $\lambda=20$, lr 0.01). Following our threat model, a modification counts as a \textbf{successful removal} only if the verifier returns \textsc{Rejected} \emph{and} test accuracy drops by at most 5 percentage points relative to that seed's clean watermarked model.
+Clean accuracy uses five trained checkpoints each for the unmarked baseline, BCE/RS32, and hinge/RS32 (seeds 0--4), and three for BCE/RS16 (seeds 0--2). Robustness uses three parent checkpoints per watermark design (seeds 0--2). Each parent supplies 84 evaluations across 47 modification configurations and one clean control. Eighteen configurations use three draws and thirty use one, including the control. The 252 evaluations per design reuse the same three trained models, release, watermark key, and test set. Stochastic attack repeats do not add independent training runs.
 
-\subsection{Clean Accuracy, Strength Sweep, and Weight-Inflation Mechanism}
-Table~\ref{tab:clean-acc} and Fig.~\ref{fig:accuracy} report paired clean CIFAR-10 test accuracy. Every trained model across all designs decoded with zero post-ECC bit errors. Across five paired seeds, BCE/RS32 incurred a mean paired cost of $-2.23$ percentage points (82.37\% vs.\ 84.60\% baseline, sample SD 2.18 pts), whereas Hinge~1.5/RS32 averaged 84.10\% ($-0.50$ pts vs.\ baseline, SD 1.79 pts). Critically, Hinge~1.5 outperformed BCE/RS32 on \emph{every single paired seed}, gaining between $+0.92$ and $+2.40$ points (mean $+1.73$ pts). Across seeds 0--2, BCE/RS16 achieved 82.26\% ($-2.81$ pts paired), closely matching BCE/RS32 despite embedding 128 fewer bits.
+The suite covers Gaussian noise relative to tensor spread (multipliers 0.01--0.5 broadly and 0.1--1.0 on the carrier), global and per-layer magnitude pruning (10--95\% and 30--90\%, respectively), pruning followed by three fine-tuning epochs, FP16 and per-tensor/per-channel quantization, fine-tuning (up to ten epochs), channel permutation and rescaling, and same-layer watermark overwriting. The 128- and 512-bit overwrites use ten epochs on a 20\% training subset at $\lambda=20$ and learning rate 0.01~\cite{projectResults}. We report the verifier verdict and test accuracy separately. A \emph{successful removal} requires \textsc{Rejected} and a test accuracy drop of at most five percentage points from that parent model's clean accuracy. This is a relative budget and does not specify an absolute accuracy requirement.
+
+\subsection{Clean Accuracy and Carrier Measurements}
+Table~\ref{tab:clean-acc} and Fig.~\ref{fig:accuracy} report the clean results. The saved training summaries report zero decoded payload errors for the 13 marked checkpoints in the table. Over five paired seeds, BCE/RS32 averaged 82.37\% ($-2.23$ points relative to baseline, paired SD 2.18 points), and hinge/RS32 averaged 84.10\% ($-0.50$ points, paired SD 1.79). The hinge-minus-BCE difference was positive in all five pairs (range 0.92--2.40 points, mean 1.73). For seeds 0--2, BCE/RS16 averaged 82.26\% ($-2.81$ points relative to the same-seed baselines) and BCE/RS32 averaged 81.98\% ($-3.10$ points). RS16 embeds 128 fewer coded bits for the same payload.
 
 \begin{table}[!t]
 \centering
-\caption{Paired Clean CIFAR-10 Test Accuracy (\%) by Training Seed}
+\caption{Paired Clean CIFAR-10 Test Accuracy (\%)}
 \label{tab:clean-acc}
 \footnotesize
-\begin{tabular}{@{}ccccc@{}}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Seed} & \textbf{Baseline} & \textbf{BCE / RS16} & \textbf{BCE / RS32} & \textbf{Hinge 1.5 / RS32} \\
+Seed & Baseline & BCE/RS16 & BCE/RS32 & Hinge/RS32 \\
 \midrule
 0 & 86.12 & 82.09 & 83.08 & 84.79 \\
 1 & 85.32 & 80.75 & 80.33 & 82.73 \\
@@ -24,119 +26,125 @@ Table~\ref{tab:clean-acc} and Fig.~\ref{fig:accuracy} report paired clean CIFAR-
 3 & 81.98 & ---   & 82.84 & 83.76 \\
 4 & 85.78 & ---   & 83.07 & 84.53 \\
 \midrule
-\textbf{Mean} & \textbf{84.60} & \textbf{82.26} & \textbf{82.37} & \textbf{84.10} \\
-\textbf{Paired $\Delta$} & --- & $-2.81$ pts & $-2.23$ pts & \textbf{$-0.50$ pts} \\
+Mean & 84.60 & 82.26 & 82.37 & 84.10 \\
+Paired $\Delta$ (pt) & --- & $-2.81$ & $-2.23$ & $-0.50$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[!tb]
 \centering\includegraphics[width=\columnwidth]{figures/01_paired_accuracy.png}
-\caption{Clean CIFAR-10 test accuracy across paired training seeds. Hinge~1.5/RS32 improves over BCE/RS32 on every seed (+1.73 pts mean).}\label{fig:accuracy}
+\caption{Clean CIFAR-10 accuracy across paired training seeds. Hinge/RS32 uses $m=1.5$. BCE/RS16 is available for seeds 0--2.}\label{fig:accuracy}
 \end{figure}
 
-To explain \emph{why} BCE costs more accuracy than Hinge---and why Hinge later fails under overwrite---Table~\ref{tab:weight-split} and Fig.~\ref{fig:mechanism} decompose the 128 filters of \texttt{features.6.0.weight} (seeds 0--2) into the shared mean filter $v$ and each filter's residual own component alongside the empirical $|z_i|$ margin distributions. In unwatermarked baselines, the shared mean holds just 2--3\% of layer energy ($\|v\|_2 = 0.11\text{--}0.13$). Under BCE ($\lambda=20$), non-vanishing gradients inflate $\|v\|_2$ to 5.05---consuming 97\% of total layer energy and pushing logits to median 3.74 (max 17.95) even though min margin is 2.24. Hinge~1.5 halts updates once $s_i z_i \ge 1.5$, cutting $\|v\|_2$ more than in half to 2.39 and lowering the shared-to-own ratio from 8.2--10.0 to 3.6--4.2, directly explaining its $+1.73$-point recovery while piling nearly all bits at the $m=1.50$ cliff. A matched seed-0 strength sweep (Fig.~\ref{fig:strength}) confirms the same margin--accuracy trend: increasing $\lambda$ from 1 to 5 to 20 raises min $|z_i|$ from 0.02 to 1.21 to 2.25 while clean accuracy declines from 84.67\% to 83.19\% to 83.08\%.
+Table~\ref{tab:weight-split} and Fig.~\ref{fig:mechanism} describe the carrier rather than a causal mechanism. For $W$ with 128 flattened filters, shared energy is $128\|v\|_2^2/\|W\|_F^2$ and the residual norm is the mean across filters of $\|W_j-v\|_2$. Across seeds 0--2 the shared norm was about 5.05 for BCE/RS32 and 2.39 for hinge/RS32, with shared energy about 97\% and 88--89\%, respectively. The minimum absolute logit across the saved clean runs for each main design was 2.24 for BCE/RS32, 2.70 for BCE/RS16, and 1.50 for hinge/RS32. These measurements document differences accompanying the loss choice. They do not isolate the role of the shared norm or margin in either accuracy or overwrite resistance.
 
 \begin{figure*}[!t]
-\centering\includegraphics[width=0.92\textwidth]{figures/06_mechanism_bce_vs_hinge.png}
-\caption{Mechanistic explanation of the BCE vs.\ Hinge tradeoff (seeds 0--2). Left: Hinge~1.5 piles projection scores at the $m=1.50$ boundary (removing the overwrite buffer), whereas BCE spreads logits across a wide cushion (median 3.74). Right: BCE inflates the carrier's shared mean filter $\|v\|_2$ to 5.05 (97\% of layer energy), while Hinge cuts it to 2.39 (89\%).}\label{fig:mechanism}
+\centering\includegraphics[width=0.90\textwidth]{figures/06_mechanism_bce_vs_hinge.png}
+\caption{Carrier decomposition recomputed from the saved checkpoints for seeds 0--2. Each point is a trained model. Panels show the shared mean-filter norm and the fraction of layer energy in that mean.}\label{fig:mechanism}
 \end{figure*}
 
 \begin{table}[!t]
 \centering
-\caption{Carrier-Layer (\texttt{features.6.0}) Weight Decomposition (Seeds 0--2)}
+\caption{Carrier Decomposition, Seeds 0--2}
 \label{tab:weight-split}
 \footnotesize
-\begin{tabular}{@{}lcccc@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Model} & \textbf{Shared $\|v\|_2$} & \textbf{Own Norm} & \textbf{Shared/Own} & \textbf{Shared Energy} \\
+Design & Shared & Residual & Ratio & Energy \\
 \midrule
 Baseline & 0.11--0.13 & 0.47--0.60 & 0.2 & 2--3\% \\
-Hinge 1.5 / RS32 & 2.39 & 0.57--0.67 & 3.6--4.2 & 88--89\% \\
+Hinge 1.5/RS32 & 2.39 & 0.57--0.67 & 3.6--4.2 & 88--89\% \\
 Hinge 2.5 (seed 0) & 3.98 & 0.56 & 7.1 & 96\% \\
-BCE / RS32 ($\lambda=20$) & 5.05 & 0.51--0.62 & 8.2--10.0 & 97\% \\
+BCE/RS32 & 5.05 & 0.51--0.62 & 8.2--10.0 & 97\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+At seed 0, the BCE/RS32 strength sweep used $\lambda=1,5,20$. The corresponding minimum absolute logits were 0.02, 1.21 and 2.25, with clean accuracies of 84.67\%, 83.19\% and 83.08\% (Fig.~\ref{fig:strength}). These are three recorded runs at one seed.
+
 \begin{figure}[!tb]
 \centering\includegraphics[width=\columnwidth]{figures/03_strength_seed0.png}
-\caption{Watermark strength sweep at fixed seed 0, carrier layer, BCE loss, and 256-bit RS32 payload.}\label{fig:strength}
+\caption{Strength sweep at fixed seed 0, carrier layer, BCE loss and 256-bit payload with RS32.}\label{fig:strength}
 \end{figure}
 
-\subsection{Robustness Under 47 Modifications and the Overwrite Tradeoff}
-Table~\ref{tab:robustness} and Fig.~\ref{fig:robust} summarize all 252 evaluations per design. Across every ``accidental'' lifecycle modification---including 10-epoch full-dataset fine-tuning at lr 0.05, Gaussian noise up to $\sigma=0.5$ globally or $\sigma=1.0$ on the carrier, global pruning up to 70\%, and per-tensor quantization down to 3 bits---all three designs verified exactly while the model retained meaningful accuracy. In particular, Fig.~\ref{fig:ecc} illustrates Reed--Solomon recovery under per-tensor quantization on BCE/RS32: at 3 bits, 1.1\% of raw codeword bits flipped, yet soft RS decoding repaired 5.33 bytes on average to recover all 256 bits cleanly even after accuracy collapsed by 57.6 points. Furthermore, all \textbf{108 evaluations involving channel permutation or combined permutation and $\times 10$ scaling} verified with exact 256-bit recovery across all three designs (zero accuracy change), as shown in Fig.~\ref{fig:align}A, demonstrating the effectiveness of Cover-bounded alignment.
+\subsection{Verification, Utility, and Overwrite}
+Table~\ref{tab:robustness} and Fig.~\ref{fig:robust} summarize saved verdicts. Exact recovery occurred even on checkpoints with large accuracy losses. For example, all three BCE/RS32 checkpoints verified after 70\% global pruning (mean accuracy 16.48\%) and after 3-bit per-tensor quantization (24.41\%). At 3 bits, the raw sign-change rate relative to the clean checkpoint averaged 1.11\%, hard RS decoding corrected 5.33 bytes on average with zero erasures on all three evaluations, and accuracy fell by 57.57 points on average (Fig.~\ref{fig:ecc}). At 2 bits, the three BCE/RS32 evaluations averaged 9.53\% accuracy. The rejected checkpoint scored 8.58\%.
+
+Across the three designs, all 108 evaluations of output, input, or all-layer permutations and the combined permutation with $\times10$ input scaling verified. All 81 evaluations of input scaling alone also verified. Recorded test accuracy was unchanged in these 189 cases. All 81 separate output-side rescaling evaluations verified, with recorded accuracy changes of up to 0.07 points in absolute value. Figure~\ref{fig:align}A displays recorded structural results from the verifier with retries available. The figure does not estimate how many would verify with retries disabled.
 
 \begin{table}[!t]
 \centering
-\caption{Robustness Summary Across 252 Evaluations per Design (Seeds 0--2)}
+\caption{Saved Verdicts Across 252 Evaluations per Design}
 \label{tab:robustness}
 \footnotesize
-\begin{tabular}{@{}lccccc@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Design} & \textbf{Verified} & \textbf{Damaged} & \textbf{Rejected} & \textbf{Removals} & \textbf{Failure Mode} \\
+Design & Verified & Damaged & Rejected & Removals \\
 \midrule
-BCE / RS32 & 231 & 20 & 1 & \textbf{0} & 2-bit quant (9.5\% acc) \\
-BCE / RS16 & 240 & 12 & 0 & \textbf{0} & None \\
-Hinge 1.5 / RS32 & 233 & 13 & 6 & \textbf{3} & \texttt{overwrite\_512bit} \\
+BCE/RS32 & 231 & 20 & 1 & 0 \\
+BCE/RS16 & 240 & 12 & 0 & 0 \\
+Hinge/RS32 & 233 & 13 & 6 & 3 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure*}[!t]
 \centering\includegraphics[width=0.90\textwidth]{figures/02_robustness.png}
-\caption{Left: Verifier outcomes across the 252-checkpoint suite per design. Right: Accuracy drop and verdict under same-layer 512-bit overwrite; all three Hinge~1.5 seeds are rejected within the 5-point utility budget (successful removals), while BCE/RS32 and BCE/RS16 retain residual provenance (\textsc{Damaged}).}\label{fig:robust}
+\caption{Left: verdict counts, including three clean controls per design. Right: per-seed accuracy drop and verdict under a 512-bit same-layer overwrite. The three hinge rejections meet the five-point budget. All six BCE evaluations yield \textsc{Damaged}, including three within that budget.}\label{fig:robust}
 \end{figure*}
 
-The decisive divergence emerges under \textbf{same-layer watermark overwriting}. Because Hinge~1.5 packs nearly all projection logits tightly at $|z_i|=1.50$ (mean 2.02) rather than leaving BCE's large margin cushion (mean 4.52), embedding a competing 512-bit watermark flips 32.4\%--36.3\% of Hinge's codeword bits, pushing raw agreement below the 358/512 (69.9\%) \textsc{Damaged} threshold and causing \textsc{Rejected} on \textbf{all three seeds} while test accuracy drops by only 4.71, 3.38, and 4.48 percentage points (all $\le 5$ pts). The remaining three Hinge rejections occurred under ruined 2-bit quantization ($\sim 10\%$ accuracy). By contrast, under the identical 512-bit overwrite, BCE/RS32 (20.3\%--25.0\% flips) and BCE/RS16 (15.9\%--24.2\% flips) both retained $\ge 75\%$ agreement and triggered \textsc{Damaged} on every seed. Notably, BCE/RS16 even achieved \emph{exact} \textsc{Verified} recovery on all three seeds under the 128-bit overwrite (clean margin 2.71 vs.\ 2.24 for RS32), leaving both BCE designs with \textbf{zero successful removals}. Counting only exact \textsc{Verified} verdicts (233 for Hinge vs.\ 231 for BCE/RS32) would mask this vulnerability entirely.
+Applying the utility filter row by row, the numbers of \textsc{Verified} evaluations within five points were 179, 181 and 184 for BCE/RS32, BCE/RS16 and hinge/RS32, respectively (176, 178 and 181 excluding their clean controls). In the 512-bit overwrite setting, hinge was rejected at drops of 4.71, 3.38 and 4.48 points, with 32.4--36.3\% of raw signs changed relative to the clean checkpoint. The other three hinge rejections were at 2-bit quantization (mean accuracy 9.90\%). The 512-bit BCE results were all \textsc{Damaged}. Their raw sign-change ranges were 20.3--25.0\% for RS32 and 15.9--24.2\% for RS16. One RS32 and two RS16 evaluations met the accuracy budget. Under the 128-bit overwrite, BCE/RS16 verified exactly in all three trials. There were zero successful removals for either BCE design in the recorded suite. Although hinge returned more exact matches than BCE/RS32 overall, the utility-filtered rejections expose an overwrite tradeoff.
 
 \begin{figure}[!tb]
 \centering\includegraphics[width=\columnwidth]{figures/05_ecc_quantization.png}
-\caption{Raw codeword error rate and mean CIFAR-10 accuracy under per-tensor quantization for BCE/RS32. Soft RS decoding recovers all 256 payload bits down to 3-bit quantization (5.3 bytes repaired on average); 2-bit quantization reduces classification accuracy to 9.5\%.}\label{fig:ecc}
+\caption{BCE/RS32 per-tensor quantization across three seeds. The 3-bit checkpoints verified with byte corrections and zero erasures. At 2 bits, the mean accuracy was 9.53\% and the verdicts were two \textsc{Damaged} and one \textsc{Rejected}.}\label{fig:ecc}
 \end{figure}
 
-\subsection{Negative Controls and Comparison with Naive Sign Embedding}
-To verify that Cover-bounded alignment and the \textsc{Damaged} threshold do not induce false detections, we evaluated 724 null checkpoints carrying no valid mark for our key (Table~\ref{tab:fp} and Fig.~\ref{fig:null}), plus 54 attacked unwatermarked baselines from the attack suite. Across all 778 negative controls, \textbf{zero} received \textsc{Verified} or \textsc{Damaged}; the highest raw agreement observed on any null model was 305/512 (well below the 358 threshold).
+\subsection{RS32 Controls and Auxiliary Baseline}
+We observed zero exact or residual detections in 724 RS32 extraction controls and zero in 54 attacked unmarked baseline evaluations (Table~\ref{tab:fp}). The extraction study includes 600 wrong-key trials on three marked checkpoints, and reuses checkpoints in several other groups. Its maximum recorded raw agreement was 305 of 512 (Fig.~\ref{fig:null}). The 54 attacked baselines are a separate cohort with saved verifier verdicts. These observations are specific to the sampled cases. They do not estimate the false-accept probability for an adaptive adversary or for RS16.
 
 \begin{table}[!t]
 \centering
-\caption{False-Positive Stress Test (RS32 Verifier, Threshold 358/512)}
+\caption{RS32 Negative Controls}
 \label{tab:fp}
 \footnotesize
-\begin{tabular}{@{}lcccc@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Null Population} & \textbf{Models} & \textbf{False V/D} & \textbf{Mean Agree} & \textbf{Max Agree} \\
+Cohort & Cases & False V/D & Mean & Max. \\
 \midrule
-Wrong watermark key & 600 & 0 / 0 & 256.2 & 305 \\
-Unmarked baselines & 3 & 0 / 0 & 253.3 & 256 \\
-Scrambled baselines & 15 & 0 / 0 & 258.5 & 278 \\
-Third-party (Mallory) & 1 & 0 / 0 & 264.0 & 264 \\
-Scrambled Mallory & 5 & 0 / 0 & 259.2 & 265 \\
-Random initialization & 100 & 0 / 0 & 256.1 & 289 \\
-Attacked baselines (suite) & 54 & 0 / 0 & --- & --- \\
+Wrong watermark key & 600 & 0/0 & 256.2 & 305 \\
+Unmarked baseline & 3 & 0/0 & 253.3 & 256 \\
+Scrambled baseline & 15 & 0/0 & 258.5 & 278 \\
+Third-party model & 1 & 0/0 & 264.0 & 264 \\
+Scrambled third-party & 5 & 0/0 & 259.2 & 265 \\
+Random initialization & 100 & 0/0 & 256.1 & 289 \\
+Attacked baseline & 54 & 0/0 & --- & --- \\
 \midrule
-\textbf{Total Controls} & \textbf{778} & \textbf{0 / 0} & --- & \textbf{305} \\
+Total & 778 & 0/0 & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[!tb]
 \centering\includegraphics[width=\columnwidth]{figures/04_false_positive_controls.png}
-\caption{Distribution of raw codeword agreement across 724 negative-control checkpoints relative to the RS32 \textsc{Damaged} threshold (358/512).}\label{fig:null}
+\caption{Observed raw agreement across the 724 RS32 extraction controls. The vertical line marks the decision threshold at 358 of 512. The separate attacked-baseline cohort is excluded.}\label{fig:null}
 \end{figure}
 
-We also evaluated an auxiliary naive baseline (the project's initial ideation design) that binds each RS32 bit directly to the sign of a single keyed weight rather than a dense projection (Fig.~\ref{fig:align}B). Across two seeds, single-weight embedding reduced clean accuracy by only $-0.09$ points on average, but suffered successful removals under \textbf{six weight-attack configurations} (carrier noise $\sigma=1$, 50\% global pruning, and four channel-permutation variants) with only 26\% exact verification overall, compared with 0 removals and 86\% exact verification (99\% traced) for our BCE/RS32 projection scheme~\cite{projectResults}. Because the naive study used two seeds and one random draw per attack versus three seeds and three draws for projection, these aggregate percentages serve as a directional rather than matched-sample comparison.
+An exploratory comparison assigns each RS32 bit to the sign of one keyed weight after training (Fig.~\ref{fig:align}B). The naive mark reduced clean accuracy by 0.09 points on average across two seeds. It was removed within budget in six configurations. Averaging equally over the 36 common non-control weight-attack settings, the exact verification rates were 26\% for the naive method and 86\% for the BCE/RS32 projection pipeline. The combined exact-or-residual rates were 61\% and 99\%. The naive extractor has no alignment retry. It uses two seeds and one draw per stochastic setting, compared with three seeds and three draws for projection. These are descriptive pipeline comparisons.
 
 \begin{figure*}[!t]
-\centering\includegraphics[width=0.94\textwidth]{figures/07_alignment_and_attacks.png}
-\caption{Left (A): Exact verification rate on function-preserving structural obfuscation attacks (0-point accuracy drop) before vs.\ after Cover-bounded alignment on BCE/RS32. Right (B): Per-family verification and tracing rates comparing single-weight naive sign embedding against keyed projection with RS32 and alignment.}\label{fig:align}
+\centering\includegraphics[width=0.96\textwidth]{figures/07_alignment_and_attacks.png}
+\caption{(A) Mean raw sign changes relative to the clean checkpoints, with exact verdict counts from the verifier with retries available. Each configuration has nine recorded evaluations per design. (B) Recorded exact and exact-or-residual rates for the naive and projection pipelines, averaged equally across common configurations within each family. The baseline evaluation uses different seed and repeat counts.}\label{fig:align}
 \end{figure*}
 
-\section{Discussion, Limitations, and Conclusion}
+\section{Discussion and Conclusion}
 \label{sec:conclusion}
+In this \textsc{SmallCNN}/CIFAR-10 evaluation, changing from BCE to hinge with RS32 improved clean accuracy across the five paired runs. In the specified 512-bit overwrite, all three hinge checkpoints were rejected within the stated utility budget, while both BCE designs retained residual agreement in all tested repeats. The carrier measurements accompany these outcomes. Matched-margin and strength controls would be needed to assess whether either quantity accounts for the observed difference.
 
-Our experiments establish a clear mechanistic tradeoff in white-box post-quantum provenance watermarking. Unbounded BCE loss inflates the carrier's shared mean filter to 97\% of layer energy, costing 2.23 percentage points of CIFAR-10 accuracy across five seeds, yet that excess logit cushion preserves provenance evidence (\textsc{Damaged}) even under an aggressive 512-bit same-layer overwrite. Capping the watermark margin via hinge loss ($m=1.5$) cuts shared-filter norm in half and recovers 1.73 accuracy points across all five seeds, but strips away the safety buffer needed to survive a 512-bit overwrite within a 5-point utility budget.
+The benchmark uses one architecture, dataset, release and watermark key, and one overwrite draw per trained model at each setting. Longer fine-tuning, distillation, cross-layer overwrites and architecture-changing obfuscation remain untested. Smaller payloads and a matched no-ECC ablation remain open. We lack a matched alignment on/off evaluation for the structural suite. The fixed-order strict-fit count and the one-shot raw-agreement null have distinct assumptions. A false-accept analysis for the complete retry and decoder remains open. The trusted auditor setting also leaves key distribution and revocation as operational questions.
 
-Several honest limitations bound our findings and motivate future work: (i)~all measurements use one compact CNN (\textsc{SmallCNN}) on CIFAR-10; scaling to deeper architectures (e.g., ResNet-18/50 or ViT) and larger datasets (CIFAR-100/ImageNet) remains open; (ii)~while Cover's theorem rigorously bounds per-channel scale recovery ($2^{-239.7}$) and 778 controls yielded zero false accepts, deriving a tight closed-form false-accept bound for the \emph{combined} permutation-plus-scaling search remains open; (iii)~untested threats include dummy-neuron insertion~\cite{yan2023rethinking}, cross-layer overwrites, longer fine-tuning, and distillation; (iv)~matched no-ECC and shorter-payload ablations are left as future sweeps; and (v)~production deployment requires exclusive developer signing-key custody, zero-knowledge or public-verifiable extraction, and trusted timestamping.
-
-In summary, decoupling an external ML-DSA-65 signed dataset manifest from a Reed--Solomon-encoded 256-bit weight projection watermark yields an end-to-end quantum-resistant provenance system with zero false positives and 100\% exact recovery under tested channel permutations and positive scalings. Crucially, evaluating verifier verdicts jointly with retained classifier utility exposes an accuracy--overwrite tradeoff between BCE and hinge objectives that clean accuracy or exact-decode metrics alone would conceal.
+The prototype uses a standardized post-quantum signature for manifest authenticity and evaluates an error-corrected weight association separately. Reporting exact recovery, residual agreement and classifier utility together makes the observed clean-accuracy and overwrite tradeoff visible.

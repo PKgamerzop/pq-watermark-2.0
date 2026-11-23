@@ -2,7 +2,7 @@
 
 # Post-Quantum AI Provenance Watermarking
 
-**A tamper-proof, quantum-safe "birth certificate" hidden inside a neural network's weights.**
+**A white-box classifier watermark linked to an ML-DSA-65 signed manifest.**
 
 [![ML-DSA-65](https://img.shields.io/badge/signature-ML--DSA--65%20(FIPS%20204)-6f42c1)](https://csrc.nist.gov/pubs/fips/204/final)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)](#quick-start)
@@ -11,7 +11,7 @@
 [![Tests](https://img.shields.io/badge/Windows_tests-85_passed%2C_1_failed-orange)](#tests)
 [![Status](https://img.shields.io/badge/SmallCNN-IEEE_paper_%26_8_figures_ready-blue)](#roadmap)
 
-*Sign a model's origin with a post-quantum signature, hide the proof in its weights,<br>and let anyone check it with one command: **VERIFIED**, **DAMAGED** or **REJECTED**.*
+*A trusted auditor checks the signed record and extracts the keyed weight watermark to report **VERIFIED**, **DAMAGED** or **REJECTED**.*
 
 [How it works](#how-it-works) · [Results](#results) · [Paper & figures](#paper-and-figures) · [Quick start](#quick-start) · [Dashboard](#pqctl-the-control-centre) · [Limitations](#honest-limitations) · [Roadmap](#roadmap)
 
@@ -23,13 +23,13 @@
 
 | | |
 |---|---|
-| **Quantum-safe signature** | The model's manifest is signed with **ML-DSA-65** (NIST FIPS 204), which resists Shor's algorithm. RSA and ECDSA do not. |
-| **Proof inside the weights** | A **256-bit payload** derived from the signed manifest is embedded *in the weights* during training, so stripping a signature file does not remove the proof. |
-| **Dataset commitment** | All **50,000 CIFAR-10 training images** are committed with a single **Merkle root**: change one pixel, label or image order and verification fails. |
+| **Post-quantum signature** | The release manifest is signed with **ML-DSA-65** (NIST FIPS 204). |
+| **Weight association** | A keyed projection embeds the **256-bit manifest digest**. Verification requires the signed release record and a trusted public key. |
+| **Dataset commitment** | A **Merkle root** commits to the ordered **50,000 CIFAR-10 training images** and labels. An optional dataset check recomputes that root. |
 | **Error correction** | **Reed-Solomon (rs32)** protects the payload: 256 bits become 512 code values, so damaged bytes can be repaired. |
 | **Robustness** | 252 evaluations per design, including controls. BCE/RS32 and BCE/RS16 recorded zero successful removals. Hinge/RS32 recorded three, all under a 512-bit overwrite. |
 | **False positives** | No false VERIFIED or DAMAGED verdicts in 724 null cases or in 54 attacked baseline evaluations (778 total controls). |
-| **IEEE manuscript** | Overleaf-ready IEEE conference paper in [`paper1/`](paper1/) with 5 tables, 8 reproducible 300-DPI figures, and 17 verified published/IEEE references. |
+| **IEEE manuscript** | IEEE-format draft in [`paper1/`](paper1/) with five tables, eight figures, and 17 bibliography entries. |
 | **One control centre** | `pqctl`: a local web dashboard and terminal tool that runs every phase, plus interactive labs (Watermark X-ray, Attack lab, Tamper lab, Signing lab). |
 
 ---
@@ -41,7 +41,7 @@ AI models get copied, fine-tuned, re-uploaded and passed off as someone else's w
 1. **A signature file next to a model can simply be deleted.** Nothing in the weights says who made them.
 2. **Today's signatures will not last.** RSA and elliptic-curve signatures can be forged by a large enough quantum computer running Shor's algorithm. A model signed today with ECDSA could be "re-signed" by anyone in the future.
 
-This project fixes both: the **proof lives inside the weights**, and it is bound to a record signed with a **post-quantum** algorithm.
+The prototype signs the manifest with a post-quantum algorithm and embeds its digest in the weights. The signature authenticates the record. Watermark extraction assesses association under the trusted-auditor profile.
 
 > **Actors.** The **Developer** trains, signs and embeds. The **Model** carries the watermark. The **Auditor** extracts and verifies (white-box access to the weights).
 
@@ -59,13 +59,16 @@ flowchart LR
         P -->|Reed-Solomon rs32| C["512 code values"]
         C -->|"training loss:<br/>CE + λ·BCE(X·v, code)"| W[" Watermarked model"]
     end
-    subgraph AUD[" Auditor"]
-        W -->|"X·v with the<br/>watermark key"| E["512 scores"]
-        E -->|sign → bits,<br/>RS repair| P2["256 bits"]
-        S -->|verify with<br/>trusted public key| OK{"signature <br/>payload == SHA-256(manifest) "}
-        P2 --> OK
-        OK -->|all checks pass| V["✅ VERIFIED"]
-        OK -->|any check fails| X["❌ REJECTED"]
+    subgraph AUD["Trusted auditor"]
+        W --> CHK{"Release and model checks"}
+        S -->|independently trusted public key| CHK
+        CHK -->|pass| E["Read carrier with pinned profile and watermark key"]
+        CHK -->|fail| X["REJECTED"]
+        E --> OK{"Exact digest after raw or retry decode?"}
+        OK -->|yes| V["VERIFIED"]
+        OK -->|no| A{"Raw agreement meets threshold?"}
+        A -->|yes| D2["DAMAGED"]
+        A -->|no| X
     end
 ```
 
@@ -73,7 +76,7 @@ flowchart LR
 
 1. **Commit to the dataset.** Every raw training image becomes a Merkle leaf, `SHA-256(0x00 | index | label | pixels)`, and the leaves are hashed up to one root. Domain-separated leaf and node hashes, and the index inside each leaf, mean images cannot be swapped, re-labelled or edited without changing the root.
 2. **Write and sign a manifest.** A canonical JSON record (developer id, dataset root, architecture, parameter count, key id) is signed with **ML-DSA-65**.
-3. **Derive the payload.** `payload = SHA-256(canonical manifest bytes)`, all 256 bits of it. Edit one character of the manifest and about half the payload bits change.
+3. **Derive the payload.** `payload = SHA-256(canonical manifest bytes)`, all 256 bits of it. A change to the serialized manifest changes the input to SHA-256.
 4. **Embed it.** The carrier vector `v` is one conv layer's weights averaged over output filters (576 numbers). A secret ±1 matrix `X`, expanded with SHAKE-256 from the **watermark key**, turns `v` into 512 scores. Training adds `λ · BCE(sigmoid(X·v), codeword)` to the usual cross-entropy, in the style of Uchida et al.
 5. **Verify.** The auditor checks the signature, rebuilds the model at the signed width, checks the parameter count and that the weights are finite, reads the 512 scores, repairs them with Reed-Solomon, and requires **all 256 bits** to equal `SHA-256(signed manifest)`. A decoder saying "ok" is never enough on its own.
 
@@ -97,19 +100,19 @@ SmallCNN (160,234 parameters) on CIFAR-10, 30 epochs, accuracy differences paire
 | BCE/RS16 (seeds 0–2) | 82.26% | −2.81 pts |
 | BCE/rep2 (seeds 0–1) | 81.52% | −4.20 pts |
 
-Every chosen-design model decodes with **0 bit errors** after correction (minimum margin 2.24 for BCE/RS32, 2.71 for BCE/RS16, 1.50 for Hinge 1.5/RS32). Weight decomposition of `features.6.0.weight` explains the +1.73 pt Hinge recovery: unbounded BCE inflates the shared mean filter norm to **5.05** (97% of layer energy), whereas Hinge 1.5 caps it at **2.39** (89% of layer energy; baseline is 0.11–0.13 / 2–3%).
+Every chosen-design model decodes with **0 bit errors** after correction (minimum margin 2.24 for BCE/RS32, 2.70 for BCE/RS16, 1.50 for Hinge 1.5/RS32). The shared mean-filter norm was **5.05** for BCE/RS32 (97% of layer energy) and **2.39** for Hinge 1.5/RS32 (88–89%) on seeds 0–2. These carrier measurements accompany the +1.73-point paired hinge accuracy gain.
 
 ### Robustness across designs (252 evaluations each, seeds 0–2)
 
-A successful removal requires a REJECTED verdict and a test accuracy drop of at most five percentage points from the clean model. DAMAGED indicates statistical evidence of the watermark (≥ 358/512, chance < 2⁻⁶⁴).
+A successful removal requires a REJECTED verdict and a test accuracy drop of at most five percentage points from the clean model. DAMAGED requires raw agreement of at least 358/512 for RS32 or 280/384 for RS16 after exact recovery fails. Each threshold has a tail below 2⁻⁶⁴ for a prespecified comparison with independent, fair hard decisions. The tail does not describe the full verifier.
 
 | Design | Verified | Damaged | Rejected | Successful removals | Failure mode |
 |---|---:|---:|---:|---:|---|
-| **BCE / RS32** | 231 | 20 | 1 | **0** | 2-bit quantization (9.5% acc, ruined) |
+| **BCE / RS32** | 231 | 20 | 1 | **0** | 2-bit quantization (8.58% for the rejected copy) |
 | **BCE / RS16** | 240 | 12 | 0 | **0** | None (even exact VERIFIED on 128-bit overwrite) |
 | **Hinge 1.5 / RS32** | 233 | 13 | 6 | **3** | `overwrite_512bit` (acc drops 3.38–4.71 pts) |
 
-All **108 evaluations** involving channel permutation or combined permutation + ×10 scaling verified with exact 256-bit recovery across all three designs.
+Across three trained checkpoints per design, **108** permutation or combined permutation + ×10 input-scale evaluations and **81** input-scaling-only evaluations verified exactly with no recorded accuracy change. Output-side rescaling was evaluated separately.
 
 ### Attack-by-attack breakdown (BCE/RS32)
 
@@ -118,7 +121,7 @@ All **108 evaluations** involving channel permutation or combined permutation + 
 | Gaussian noise (all weights) | σ = 0.5 × weight spread (accuracy falls to 44%) | ✅ held |
 | Noise aimed at the watermark layer | σ = 1.0 (accuracy 56%) | ✅ held |
 | Global magnitude pruning | 70% of weights deleted (model already useless) | ✅ held |
-| Quantization, per tensor | **3 bits**, ECC repaired 5.3 bytes on average | ✅ held |
+| Quantization, per tensor | **3 bits**, hard RS repaired 5.33 bytes on average | ✅ held |
 | float16 round trip | exact | ✅ held |
 | Fine-tuning | 10 epochs on the **full** dataset, lr 0.05 | ✅ held |
 | Prune 50% + fine-tune | 3 epochs | ✅ held |
@@ -126,24 +129,24 @@ All **108 evaluations** involving channel permutation or combined permutation + 
 | Shuffle the carrier's **output** channels | all 9 runs | ✅ held |
 | Shuffle the carrier's **input** channels (removed it in Phase 6) | all 9 runs: re-aligned by the verifier | ✅ held |
 | Rescale the carrier's input channels (new in 6b) | ×100, and shuffle + ×10 | ✅ held |
-| Overwrite with a second watermark, 128 or 512 bits (removed it in Phase 6) | exact payload lost, our code still at 75-91% agreement | ✅ traced (DAMAGED) |
+| Overwrite with a second watermark, 128 or 512 bits (removed it in Phase 6) | exact payload lost and residual threshold met | ✅ traced (DAMAGED) |
 
-**Totals (Phase 6b verifier):** **231 / 252** attacked copies verified exactly, **20** more traced as DAMAGED, **1** rejected (2-bit quantization, accuracy 9.5%) · **0 successful removals** (Phase 6 had 4 attack types) · **0 / 54** false accepts on unmarked models, plus **0 / 724** in the false-accept stress test. Full tables: [`docs/phase6b_results.md`](docs/phase6b_results.md) (now) and [`docs/phase6_results.md`](docs/phase6_results.md) (before the defence).
+**Totals (Phase 6b verifier):** **231 / 252** evaluations including clean controls verified exactly, **20** more traced as DAMAGED, **1** rejected (2-bit quantization, 8.58% accuracy for the rejected copy) · **0 successful removals** (Phase 6 had 4 attack types) · **0 / 54** false accepts on unmarked models, plus **0 / 724** in the false-accept stress test. Full tables: [`docs/phase6b_results.md`](docs/phase6b_results.md) (now) and [`docs/phase6_results.md`](docs/phase6_results.md) (before the defence).
 
-**How Phase 6b closes the gaps.** Shuffling or positively rescaling the channels that feed the carrier leaves the model's answers identical but scrambles the carrier. The verifier now undoes both (Hungarian re-alignment and a small linear program, `embedding/align.py`) and still demands an exact 256-bit match. That search only runs when a counting bound (Cover's theorem) proves it cannot fit a codeword the model never carried: below 2⁻²³⁹ for rs32. When an overwrite destroys the exact payload, the verifier counts how many code values still agree with the signed codeword in the model's own channel order. Above 358 of 512 the chance for an unmarked model is below 2⁻⁶⁴, so it reports **DAMAGED**: the copy is provably derived from ours.
+**Phase 6b extraction retries.** After a failed raw read, the verifier may try channel assignment and positive-scale fitting, then checks for the exact digest. Cover’s count gives a conditional probability bound for strict sign fitting with a fixed channel order and independent uniform labels. It serves as an eligibility rule. A bound for the implemented assignment and decoder remains open. See the [manuscript methods](paper1/method.tex) for the extraction profile and the two null models.
 
 <details>
-<summary><b>Show the plots (8 publication-grade 300-DPI figures)</b></summary>
+<summary><b>Show the eight manuscript figures</b></summary>
 
 | | |
 |:---:|:---:|
-| ![Architecture](results/phase7/paper_figures/00_architecture.png) | ![Paired accuracy](results/phase7/paper_figures/01_paired_accuracy.png) |
+| ![Architecture](paper1/figures/00_architecture.png) | ![Paired accuracy](paper1/figures/01_paired_accuracy.png) |
 | **End-to-end protocol architecture** | **Paired CIFAR-10 accuracy (5 seeds)** |
-| ![Robustness & overwrite](results/phase7/paper_figures/02_robustness.png) | ![BCE vs Hinge mechanism](results/phase7/paper_figures/06_mechanism_bce_vs_hinge.png) |
-| **252-checkpoint verdicts & 512-bit overwrite** | **BCE vs Hinge logit margins & weight energy** |
-| ![Alignment & naive comparison](results/phase7/paper_figures/07_alignment_and_attacks.png) | ![False-positive controls](results/phase7/paper_figures/04_false_positive_controls.png) |
-| **Obfuscation recovery & naive vs projection** | **724 negative controls vs Binomial(512, 1/2)** |
-| ![ECC under quantization](results/phase7/paper_figures/05_ecc_quantization.png) | ![Lambda strength sweep](results/phase7/paper_figures/03_strength_seed0.png) |
+| ![Robustness & overwrite](paper1/figures/02_robustness.png) | ![BCE and Hinge carrier measurements](paper1/figures/06_mechanism_bce_vs_hinge.png) |
+| **252-checkpoint verdicts & 512-bit overwrite** | **Shared-filter norm and energy** |
+| ![Alignment & naive comparison](paper1/figures/07_alignment_and_attacks.png) | ![False-positive controls](paper1/figures/04_false_positive_controls.png) |
+| **Obfuscation recovery & naive vs projection** | **724 RS32 extraction controls** |
+| ![ECC under quantization](paper1/figures/05_ecc_quantization.png) | ![Lambda strength sweep](paper1/figures/03_strength_seed0.png) |
 | **RS32 error correction & accuracy under quantization** | **Watermark strength sweep (seed 0)** |
 
 </details>
@@ -321,23 +324,11 @@ docs/            threat model, measured results, every command used, pqctl guide
 
 ## Paper and figures
 
-The full Overleaf-ready IEEE conference manuscript lives in [`paper1/`](paper1/) (`main.tex`, `abstract.tex`, `introduction.tex`, `literature_review.tex`, `method.tex`, `evaluation.tex`, `provenance_refs.bib`, and `figures/`). All 17 references in `paper1/provenance_refs.bib` are verified published/IEEE/standard entries (no archive-only preprints).
+The IEEE-format draft is in [`paper1/`](paper1/). Build `paper1/main.tex` with IEEEtran and BibTeX. The separate `paper/` tree and its Overleaf ZIP contain the earlier draft.
 
-Regenerate all **eight 300-DPI PNG figures** from the saved CSVs and checkpoints (and sync them into `paper1/figures/`):
+Regenerate the five revised figures from the saved CSVs and CPU-loaded checkpoints with `python paper1/render_audit_figures.py`. The remaining three figures retain their saved versions. Historical graphics remain in `results/phase7/paper_figures/`.
 
-```bash
-python -m experiments.phase7.paper_figures --also-copy paper1/figures
-```
-
-Generated figures ([`results/phase7/paper_figures/`](results/phase7/paper_figures/)):
-1. `00_architecture.png` — End-to-end Merkle + ML-DSA-65 + RS projection + Cover-bounded verifier architecture
-2. `01_paired_accuracy.png` — Paired clean CIFAR-10 accuracy across 5 seeds with mean markers
-3. `02_robustness.png` — 252-checkpoint verdict breakdown and 512-bit overwrite drops vs. the 5-point utility limit
-4. `03_strength_seed0.png` — Seed-0 watermark strength (λ) vs. accuracy and minimum logit margin
-5. `04_false_positive_controls.png` — 724 negative controls against exact Binomial(512, 1/2) and the 358 `DAMAGED` threshold
-6. `05_ecc_quantization.png` — RS32 error correction and CIFAR-10 accuracy under per-tensor quantization
-7. `06_mechanism_bce_vs_hinge.png` — BCE vs. Hinge projection margin distributions and carrier shared-filter weight decomposition
-8. `07_alignment_and_attacks.png` — Structural obfuscation recovery (before vs. after alignment) and naive sign vs. projection comparison
+See the [fixes changelog](audit/FIXES_CHANGELOG.md) and [remaining issues](audit/REMAINING_ISSUES.md) for the scope of the evidence and build checks.
 
 ## Roadmap
 
@@ -351,8 +342,8 @@ Generated figures ([`results/phase7/paper_figures/`](results/phase7/paper_figure
 | 5 | One-command verifier, Mallory, negative cases, full-payload fix (H1) | ✅ |
 | 6 | 43-attack suite and results | ✅ |
 | 6b | Permutation and scaling defence, DAMAGED verdict, false-accept stress test | ✅ |
-| 7 | SmallCNN/CIFAR-10 evaluation | ✅ Five-seed accuracy, 3-design robustness, report, and 8 publication figures ready (19 sweep runs are future work) |
-| 8 | Write-up, 3-minute live demo, mentor Q&A | in progress (IEEE manuscript in `paper1/` ready for Overleaf; demo & Q&A remain) |
+| 7 | SmallCNN/CIFAR-10 evaluation | ✅ Five-seed accuracy, 3-design robustness, report, and 8 manuscript figures (19 sweep runs are future work) |
+| 8 | Write-up, 3-minute live demo, mentor Q&A | in progress (IEEE-format draft in `paper1/` under review; demo & Q&A remain) |
 
 ---
 
@@ -384,6 +375,6 @@ Built by engineering students at **RV College of Engineering, Bengaluru**: **Pra
 
 ---
 
-**Signed today. Still trustworthy after quantum computers arrive.**
+**ML-DSA-65 signed manifests with white-box watermark extraction.**
 
 </div>
