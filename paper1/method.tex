@@ -14,7 +14,7 @@ Our removal study uses specified post-training modifications on the weights. The
 Under the signature assumptions, a valid signature authenticates the manifest to the trusted public key. An exact watermark match supports association of the checkpoint with that record under the extraction profile. The signed root commits to the ordered dataset representation. Comparing a supplied dataset against it is a separate operation from model verification. It does not establish the actual training inputs or their quality. The manifest's timestamp is self-declared. Legal ownership and priority require independent evidence.
 
 \subsection{Dataset Commitment and ML-DSA-65 Manifest Signing}
-The developer computes a SHA-256 Merkle root for the ordered 50,000 CIFAR-10 training images~\cite{cifar10,merkle1987digital}. Each leaf hashes a domain tag, sample index, label, and raw unsigned 8-bit pixel bytes:
+The developer builds on Merkle tree hashing~\cite{merkle1987digital} to commit to the ordered 50,000 CIFAR-10 training images~\cite{cifar10}. Our format uses SHA-256. Each leaf hashes a domain tag, sample index, label, and raw unsigned 8-bit pixel bytes:
 \begin{equation}
   h_i = \mathrm{SHA256}\bigl(\texttt{0x00} \parallel \mathrm{u64be}(i)
       \parallel \mathrm{u16be}(y_i) \parallel \mathbf{x}_i\bigr).
@@ -53,7 +53,7 @@ Under compensated channel permutations and positive input scalings, the correspo
     =\sum_{c=1}^{C} A_c\cdot v_{\pi(c)}.
  \label{eq:assignment}
 \end{equation}
-This is the linear assignment problem associated with the Hungarian method~\cite{kuhn1955hungarian}. The implementation calls SciPy's assignment solver. Maximizing this score gives no guarantee of recovering the original order or of satisfying every sign constraint.
+This is the linear assignment problem associated with the Hungarian method~\cite{kuhn1955hungarian}. The implementation calls SciPy's \texttt{linear\_sum\_assignment}. Maximizing this score gives no guarantee of recovering the original order or of satisfying every sign constraint.
 
 For a fixed order, let $g_{jc}=X_{j,c}\cdot v_c$, where $X_{j,c}$ is the block of projection row $j$ for channel $c$. The scale retry uses a HiGHS linear program that maximizes $t$ subject to $\sum_c a_c=C$, $a_c\ge10^{-3}$, and $s_j\sum_c g_{jc}a_c\ge t$ for each $j$, after positive normalization of the coefficient matrix. The implemented search may decode the fitted carrier even when $t\le 0$. The floor restricts the fitted scales. Recovery under these procedures is reported for the evaluated cases in Section~\ref{sec:evaluation}.
 

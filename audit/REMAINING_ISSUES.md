@@ -1,5 +1,7 @@
 # Remaining issues for IEEE editorial and technical review
 
+This file records the earlier audit-fixes checkpoint. The [final validation report](FINAL_VALIDATION_REPORT.md) records the completed liboqs and dataset checks, and [submission blockers](SUBMISSION_BLOCKERS.md) gives the current open issues.
+
 This branch addresses the unsupported claims and inferred Figure 8A values identified in the audit. It is an evidence-grounded draft for subsequent review. The original evidence is pinned to `fc526ae62ad030c07e51b57e6406acd837154ea3` in `PKgamerzop/pq-watermark-2.0`.
 
 | Priority | Open item | Verification needed |

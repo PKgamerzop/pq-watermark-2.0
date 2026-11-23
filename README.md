@@ -127,7 +127,7 @@ Across three trained checkpoints per design, **108** permutation or combined per
 | Prune 50% + fine-tune | 3 epochs | ✅ held |
 | Channel rescaling (function-preserving) | ×10 on every layer | ✅ held |
 | Shuffle the carrier's **output** channels | all 9 runs | ✅ held |
-| Shuffle the carrier's **input** channels (removed it in Phase 6) | all 9 runs: re-aligned by the verifier | ✅ held |
+| Shuffle the carrier's **input** channels (removed it in Phase 6) | 9/9 exact with extraction retries available | ✅ held |
 | Rescale the carrier's input channels (new in 6b) | ×100, and shuffle + ×10 | ✅ held |
 | Overwrite with a second watermark, 128 or 512 bits (removed it in Phase 6) | exact payload lost and residual threshold met | ✅ traced (DAMAGED) |
 
@@ -187,9 +187,11 @@ python tests/test_mldsa.py                                            # prints: 
 ```
 
 > On native Windows, see *Setup: liboqs on native Windows* in [`docs/phase_commands.md`](docs/phase_commands.md).
-> `keys/` is git-ignored. To verify the shipped models, get `keys/public_key.bin` and `keys/watermark_key.bin` from the team.
+> Obtain the public key independently from the trusted release owner. The historical watermark key is distributed separately to authorized auditors.
 
 ### 2. Verify a model
+
+The saved run transcript below uses the project-generated sidecar. For an externally supplied checkpoint, pin the extraction settings explicitly or use a trusted sidecar, and leave the legacy short-payload override disabled.
 
 ```console
 $ python -m verify.verify_model --model runs/wm_v1/lam20_n256_rs32/seed0/model.pt
@@ -279,8 +281,8 @@ Full guide: [`docs/PQCTL.md`](docs/PQCTL.md).
 
 **Hardening built in:**
 
-- **Full payload required (fix H1):** a forger cannot ask the verifier to check only 8 bits and retry keys until an unrelated model passes.
-- **No code execution:** checkpoints are loaded as plain tensors only, so a malicious pickled `.pt` file is rejected, never run.
+- **Full payload by default:** the verifier checks the signed payload length. The explicit legacy override permits a shorter check.
+- **Restricted checkpoint loading:** use a PyTorch version supporting `weights_only=True`. Versions without the argument reach a legacy fallback.
 - **NaN/inf weights are rejected** explicitly.
 
 ---
